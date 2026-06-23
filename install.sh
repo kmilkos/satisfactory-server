@@ -263,6 +263,16 @@ install_steamcmd() {
     if [ -f "$STEAMCMD_DIR/linux64/steamclient.so" ]; then
         ln -sf "$STEAMCMD_DIR/linux64/steamclient.so" /root/.steam/sdk64/steamclient.so
     fi
+    
+    # Configure symlink for the dedicated system user
+    local user_home=$(eval echo "~$SERVICE_USER")
+    if [ -d "$user_home" ]; then
+        mkdir -p "$user_home/.steam/sdk64"
+        if [ -f "$STEAMCMD_DIR/linux64/steamclient.so" ]; then
+            ln -sf "$STEAMCMD_DIR/linux64/steamclient.so" "$user_home/.steam/sdk64/steamclient.so"
+        fi
+        chown -R "$SERVICE_USER:$SERVICE_USER" "$user_home/.steam"
+    fi
 }
 
 # Deploy Satisfactory Server Manager Project Files
@@ -281,10 +291,8 @@ deploy_manager_app() {
     else
         # Standalone remote download path
         log_warn "Standalone deployment mode active. Fetching project artifacts..."
-        # If this is fetched via curl, we can clone a git repo or download a zip
-        # Since this project is customized for this environment, we fallback to git clone or tarball download.
-        # Here we provide a mock/customizable repository checkout.
-        local repo_url="https://github.com/satisfactorymodding/satisfactory-server-manager.git"
+        # Clones custom repository containing platform checks and permission fixes
+        local repo_url="https://github.com/kmilkos/satisfactory-server.git"
         run_with_spinner "Cloning server manager repository" \
             git clone "$repo_url" "$INSTALL_DIR"
     fi

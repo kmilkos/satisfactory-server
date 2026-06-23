@@ -1370,9 +1370,8 @@ function startSteamCmdSimulation() {
     '+app_update', '1690800', 'validate',
     '+quit'
   ];
-
   try {
-    steamCmdProcess = spawn(steamCmdPath, args, { env: { ...process.env, HOME: '/root' } });
+    steamCmdProcess = spawn('sudo', ['-u', 'satisfactory', steamCmdPath, ...args], { env: { ...process.env, HOME: '/opt/satisfactory-server' } });
     
     steamCmdProcess.stdout.on('data', (data) => {
       const output = data.toString();
