@@ -1,0 +1,200 @@
+/* Custom Styles for FICSIT Remote Manager & Cognitive Link Dashboard */
+
+/* Custom Font Settings & Icon Alignment */
+.material-symbols-outlined {
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+/* Glassmorphism panel style */
+.glass-panel {
+    background: rgba(15, 23, 42, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(83, 68, 54, 0.3);
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: #060e20;
+}
+::-webkit-scrollbar-thumb {
+    background: #2d3449;
+    border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #f19e38;
+}
+
+/* Scrollbar Hide class */
+.scrollbar-hide::-webkit-scrollbar {
+    display: none;
+}
+
+/* Industrial themed scrollbar */
+.scrollbar-industrial::-webkit-scrollbar {
+    width: 4px;
+}
+.scrollbar-industrial::-webkit-scrollbar-track {
+    background: #131b2e;
+}
+.scrollbar-industrial::-webkit-scrollbar-thumb {
+    background: #534436;
+}
+.scrollbar-industrial::-webkit-scrollbar-thumb:hover {
+    background: #ffbf7b;
+}
+
+/* Scanline/CRTScreen effects */
+@keyframes scanline {
+    0% { transform: translateY(-100%); }
+    100% { transform: translateY(100%); }
+}
+.scanline-effect {
+    position: relative;
+}
+.scanline-effect::after {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: linear-gradient(to bottom, transparent, rgba(241, 158, 56, 0.04), transparent);
+    animation: scanline 8s linear infinite;
+    pointer-events: none;
+}
+
+/* Zebra striping for server output log lists */
+.zebra-stripe:nth-child(even) {
+    background: rgba(255, 255, 255, 0.02);
+}
+.console-stripe:nth-child(even) {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+/* Progress bar shimmer effect */
+@keyframes progress-shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+.shimmer-effect {
+    animation: progress-shimmer 2s infinite;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+}
+
+/* AI Shell blinking terminal cursor */
+.cursor-blink {
+    animation: blink 1s step-end infinite;
+}
+@keyframes blink {
+    from, to { opacity: 1; }
+    50% { opacity: 0; }
+}
+
+/* Hazard Warning stripes */
+.hazard-stripe {
+    background: repeating-linear-gradient(
+        45deg,
+        #f19e38,
+        #f19e38 10px,
+        #000000 10px,
+        #000000 20px
+    );
+}
+
+/* Line numbers gutter for editor/terminal */
+.line-numbers {
+    border-right: 1px solid #2d3449;
+    color: #534436;
+}
+
+/* Transition for active tabs */
+.tab-content {
+    display: none !important;
+}
+.tab-content.active {
+    display: flex !important;
+    animation: fadeIn 0.3s ease-in-out forwards;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Floating custom notification toast styling */
+#sync-toast {
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 10px rgba(241, 158, 56, 0.2);
+}
+
+/* Custom styles for SVG dynamic charts */
+.chart-line {
+    stroke-dasharray: 1000;
+    stroke-dashoffset: 1000;
+    animation: drawLine 2s ease-out forwards;
+}
+
+@keyframes drawLine {
+    to {
+        stroke-dashoffset: 0;
+    }
+}
+
+/* Metric card pulsing hover animations */
+.metric-card:hover {
+    box-shadow: 0 0 12px rgba(241, 158, 56, 0.1);
+    border-color: rgba(241, 158, 56, 0.4);
+}
+
+/* Active item accent for mods list selection */
+.active-item-accent {
+    border-left: 4px solid #f19e38 !important;
+    background-color: #1e293b !important;
+}
+
+/* Mockup-guided styles for subtabs, hazard patterns, and scanlines */
+.hazard-pattern {
+    background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(241, 158, 56, 0.1) 10px, rgba(241, 158, 56, 0.1) 20px);
+}
+
+.scanline {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(to bottom, transparent 50%, rgba(0, 0, 0, 0.05) 50%);
+    background-size: 100% 4px;
+    pointer-events: none;
+    z-index: 10;
+}
+
+/* Sub-tab visibility and transition states */
+.sub-tab-content {
+    display: none !important;
+}
+.sub-tab-content.active {
+    display: flex !important;
+    animation: subTabFadeIn 0.2s ease-in-out forwards;
+}
+
+@keyframes subTabFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(2px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+

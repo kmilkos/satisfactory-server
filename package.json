@@ -1,0 +1,16 @@
+{
+  "name": "satisfactory-server-manager",
+  "version": "1.0.0",
+  "description": "FICSIT Cognitive Link & Remote Server Manager",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "ws": "^8.17.0"
+  },
+  "author": "FICSIT Inc.",
+  "license": "ISC"
+}
