@@ -1364,6 +1364,7 @@ function startSteamCmdSimulation() {
 
   const steamCmdPath = '/opt/steamcmd/steamcmd.sh';
   const args = [
+    '+@sSteamCmdForcePlatformType', 'linux',
     '+force_install_dir', '/opt/satisfactory-server/server',
     '+login', 'anonymous',
     '+app_update', '1690800', 'validate',
