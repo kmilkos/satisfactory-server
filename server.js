@@ -1470,9 +1470,20 @@ function abortSteamCmdSimulation() {
     broadcastToWs('steamcmd_state', serverState.steamCmd);
   }
 }
+function stripAnsi(str) {
+  if (typeof str !== 'string') return str;
+  return str.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
+}
 
 // WebSocket broadcast helpers
 function broadcastToWs(type, data) {
+  // Strip ANSI escape sequences from logs to prevent rendering corruption in the browser console
+  if (type === 'steamcmd_log' || type === 'ficsit_log') {
+    data = stripAnsi(data);
+  } else if (type === 'console_log' && data && typeof data.message === 'string') {
+    data.message = stripAnsi(data.message);
+  }
+
   if (type === 'ficsit_log') {
     console.log(`[FICSIT-LOG] ${data}`);
   }
@@ -1489,6 +1500,7 @@ function broadcastToWs(type, data) {
     }
   });
 }
+
 
 // AI Chat proxy endpoint — routes to configured provider
 const http2 = require('http'); // alias for clarity
