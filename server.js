@@ -1371,7 +1371,7 @@ function startSteamCmdSimulation() {
     '+quit'
   ];
   try {
-    steamCmdProcess = spawn('sudo', ['-u', 'satisfactory', steamCmdPath, ...args], { env: { ...process.env, HOME: '/opt/satisfactory-server' } });
+    steamCmdProcess = spawn('sudo', ['-u', 'satisfactory', steamCmdPath, ...args], { env: { ...process.env, HOME: '/opt/satisfactory-server', LC_ALL: 'en_US.UTF-8', LANG: 'en_US.UTF-8' } });
     
     steamCmdProcess.stdout.on('data', (data) => {
       const output = data.toString();

@@ -209,6 +209,9 @@ install_dependencies() {
                 curl tar gzip unzip sudo xclip ca-certificates \
                 lib32gcc-s1 lib32stdc++6 libc6-i386 \
                 git jq
+        
+        # Generate en_US.UTF-8 locale to prevent SteamCMD locale warning
+        run_with_spinner "Generating en_US.UTF-8 locale" locale-gen en_US.UTF-8
     else
         log_warn "Non-APT system. Please make sure curl, tar, gzip, unzip, sudo, and 32-bit libraries (lib32gcc-s1, etc.) are installed."
     fi
