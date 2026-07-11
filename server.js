@@ -360,7 +360,7 @@ app.get('/api/v1/diskspace', (req, res) => {
 
 // Helper for loading installed mods from filesystem
 const MODS_DIR = '/opt/satisfactory-server/server/FactoryGame/Mods';
-const PROFILES_PATH = '/root/.local/share/ficsit/profiles.json';
+const PROFILES_PATH = '/opt/satisfactory-server/.local/share/ficsit/profiles.json';
 
 function loadInstalledMods() {
   const installedMods = [];
@@ -749,6 +749,7 @@ function startServer() {
               if (!serverState.players.includes(player)) {
                 serverState.players.push(player);
                 broadcastToWs('server_status_update', serverState);
+                handlePlayerJoined(player);
               }
             }
           }
@@ -804,32 +805,98 @@ function startServer() {
   return true;
 }
 
+async function handlePlayerJoined(player) {
+  broadcastToWs('console_log', {
+    timestamp: new Date().toISOString(),
+    source: 'SYSTEM',
+    message: `Player "${player}" joined the session.`
+  });
+
+  broadcastToWs('player_joined', { player, timestamp: new Date().toISOString() });
+
+  if (frmConfig.enabled && frmActiveAiConfig && frmActivePersona) {
+    try {
+      const contextBlurb = `\n\n[EVENT]\nPlayer "${player}" has just joined the game server. Welcome them to the server in character. Keep your reply extremely SHORT (1 sentence) and plain text. Do NOT use markdown.`;
+      const enrichedSystemPrompt = (frmActiveAiConfig.systemPrompt || '') + contextBlurb;
+
+      const chatRes = await fetch(`http://localhost:${process.env.PORT || 3030}/api/v1/ai/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: frmActiveAiConfig.provider,
+          baseUrl: frmActiveAiConfig.baseUrl,
+          apiKey: frmActiveAiConfig.apiKey,
+          model: frmActiveAiConfig.model,
+          systemPrompt: enrichedSystemPrompt,
+          message: `Greet player ${player}.`
+        })
+      });
+      const chatData = await chatRes.json();
+      if (chatData.success && chatData.reply) {
+        const personaNames = { ada: 'A.D.A.', shroud: 'THE SHROUD', unit7: 'UNIT-7' };
+        const senderName = personaNames[frmActivePersona] || 'AI';
+        const color = personaChatColors[frmActivePersona] || { r: 1, g: 1, b: 1, a: 1 };
+
+        await frmPost('/sendChatMessage', {
+          message: chatData.reply.substring(0, 512),
+          sender: senderName,
+          color
+        });
+
+        broadcastToWs('game_chat_ai_response', {
+          persona: frmActivePersona,
+          sender: senderName,
+          message: chatData.reply,
+          timestamp: Math.floor(Date.now() / 1000)
+        });
+      }
+    } catch (err) {
+      if (process.env.DEBUG_FRM) console.error('[FRM welcome error]', err.message);
+    }
+  }
+}
+
 function stopServer(callback) {
   if (serverState.status === 'STOPPED' && !factoryServerProcess) {
     if (callback) callback();
     return;
   }
 
-  serverState.status = 'STOPPED';
-  serverState.tps = 0.0;
-  serverState.ramUsed = 0.0;
-  serverState.players = [];
+  let targetPid = factoryServerProcess ? factoryServerProcess.pid : null;
 
-  broadcastToWs('console_log', {
-    timestamp: new Date().toISOString(),
-    source: 'SYSTEM',
-    message: 'SIGINT signal sent. Shutting down dedicated server...'
-  });
+  const performStop = () => {
+    serverState.status = 'STOPPED';
+    serverState.tps = 0.0;
+    serverState.ramUsed = 0.0;
+    serverState.players = [];
 
-  broadcastToWs('server_status_update', serverState);
+    broadcastToWs('console_log', {
+      timestamp: new Date().toISOString(),
+      source: 'SYSTEM',
+      message: 'SIGINT signal sent. Shutting down dedicated server...'
+    });
 
-  let terminated = false;
+    broadcastToWs('server_status_update', serverState);
 
-  const checkTermination = () => {
-    if (terminated) return;
-    exec('pgrep -f FactoryServer-Linux-Shipping', (err, stdout) => {
-      if (!stdout.trim()) {
-        terminated = true;
+    let terminated = false;
+
+    const checkTermination = () => {
+      if (terminated) return;
+      if (targetPid) {
+        try {
+          process.kill(targetPid, 0);
+        } catch (e) {
+          terminated = true;
+        }
+      } else {
+        exec('pgrep -f FactoryServer-Linux-Shipping', (err, stdout) => {
+          if (!stdout.trim()) {
+            terminated = true;
+          }
+        });
+      }
+
+      if (terminated) {
         broadcastToWs('console_log', {
           timestamp: new Date().toISOString(),
           source: 'SYSTEM',
@@ -837,46 +904,60 @@ function stopServer(callback) {
         });
         if (callback) callback();
       }
-    });
+    };
+
+    if (targetPid) {
+      try {
+        process.kill(targetPid, 'SIGINT');
+      } catch (e) {}
+    } else {
+      exec('pkill -INT -f FactoryServer-Linux-Shipping');
+    }
+
+    let pollCount = 0;
+    const pollInterval = setInterval(() => {
+      pollCount++;
+      checkTermination();
+      if (terminated || pollCount > 30) {
+        clearInterval(pollInterval);
+        if (!terminated) {
+          broadcastToWs('console_log', {
+            timestamp: new Date().toISOString(),
+            source: 'SYSTEM',
+            message: 'Server process did not terminate within 30 seconds. Sending SIGKILL...'
+          });
+          if (targetPid) {
+            try {
+              process.kill(targetPid, 'SIGKILL');
+            } catch (e) {}
+          } else {
+            exec('pkill -KILL -f FactoryServer-Linux-Shipping');
+          }
+          setTimeout(() => {
+            if (factoryServerProcess && factoryServerProcess.pid === targetPid) {
+              factoryServerProcess = null;
+            }
+            if (callback) callback();
+          }, 1000);
+        } else {
+          if (factoryServerProcess && factoryServerProcess.pid === targetPid) {
+            factoryServerProcess = null;
+          }
+        }
+      }
+    }, 1000);
   };
 
-  // Try graceful shutdown
-  exec('pkill -INT -f FactoryServer-Linux-Shipping');
-  if (factoryServerProcess) {
-    try {
-      factoryServerProcess.kill('SIGINT');
-    } catch (e) {}
-  }
-
-  // Poll for termination
-  let pollCount = 0;
-  const pollInterval = setInterval(() => {
-    pollCount++;
-    checkTermination();
-    if (terminated || pollCount > 30) {
-      clearInterval(pollInterval);
-      if (!terminated) {
-        // Force kill
-        broadcastToWs('console_log', {
-          timestamp: new Date().toISOString(),
-          source: 'SYSTEM',
-          message: 'Server process did not terminate within 30 seconds. Sending SIGKILL...'
-        });
-        exec('pkill -KILL -f FactoryServer-Linux-Shipping');
-        if (factoryServerProcess) {
-          try {
-            factoryServerProcess.kill('SIGKILL');
-          } catch (e) {}
-        }
-        setTimeout(() => {
-          factoryServerProcess = null;
-          if (callback) callback();
-        }, 1000);
-      } else {
-        factoryServerProcess = null;
+  if (!targetPid) {
+    exec('pgrep -f FactoryServer-Linux-Shipping', (err, stdout) => {
+      if (stdout.trim()) {
+        targetPid = parseInt(stdout.trim().split('\n')[0]);
       }
-    }
-  }, 1000);
+      performStop();
+    });
+  } else {
+    performStop();
+  }
 }
 
 // Dedicated server power endpoints
@@ -1488,6 +1569,7 @@ function broadcastToWs(type, data) {
     console.log(`[FICSIT-LOG] ${data}`);
   }
   if (type === 'console_log') {
+    console.log(`[CONSOLE-LOG] [${data.source || 'UNKNOWN'}] ${data.message}`);
     consoleLogHistory.push(data);
     if (consoleLogHistory.length > 200) {
       consoleLogHistory.shift();
@@ -1540,6 +1622,112 @@ app.get('/api/v1/ai/ollama/models', async (req, res) => {
     res.json({ success: false, error: `Cannot reach Ollama at ${baseUrl}: ${err.message}` });
   }
 });
+
+// GET /api/v1/ai/models — generic models fetching endpoint
+app.get('/api/v1/ai/models', async (req, res) => {
+  const { provider, baseUrl, apiKey } = req.query;
+  if (!provider) {
+    return res.status(400).json({ success: false, error: 'Missing provider' });
+  }
+
+  try {
+    if (provider === 'ollama') {
+      const targetBaseUrl = baseUrl || 'http://localhost:11434';
+      const [tagsRes, psRes] = await Promise.all([
+        fetch(`${targetBaseUrl}/api/tags`),
+        fetch(`${targetBaseUrl}/api/ps`).catch(() => ({ ok: false }))
+      ]);
+      if (!tagsRes.ok) {
+        return res.json({ success: false, error: `Ollama responded with status ${tagsRes.status}` });
+      }
+      const tagsData = await tagsRes.json();
+      const psData = psRes.ok ? await psRes.json() : { models: [] };
+      const models = (tagsData.models || []).map(m => ({
+        name: m.name,
+        value: m.name,
+        size: m.details?.parameter_size || ''
+      }));
+      const activeModel = psData.models?.length > 0 ? (psData.models[0].name || psData.models[0].model) : null;
+      return res.json({ success: true, models, activeModel });
+    }
+
+    if (provider === 'gemini') {
+      const targetBaseUrl = baseUrl || 'https://generativelanguage.googleapis.com';
+      const url = `${targetBaseUrl}/v1beta/models?key=${apiKey || ''}`;
+      const response = await fetch(url);
+      if (!response.ok) {
+        const errTxt = await response.text();
+        return res.json({ success: false, error: `Gemini API error ${response.status}: ${errTxt.substring(0, 150)}` });
+      }
+      const data = await response.json();
+      const models = (data.models || [])
+        .filter(m => m.supportedGenerationMethods?.includes('generateContent'))
+        .map(m => ({
+          name: m.displayName || m.name,
+          value: m.name.replace(/^models\//, '')
+        }));
+      return res.json({ success: true, models });
+    }
+
+    if (provider === 'openrouter') {
+      const url = 'https://openrouter.ai/api/v1/models';
+      const response = await fetch(url);
+      if (!response.ok) {
+        return res.json({ success: false, error: `OpenRouter responded with status ${response.status}` });
+      }
+      const data = await response.json();
+      const models = (data.data || []).map(m => ({
+        name: m.name || m.id,
+        value: m.id
+      }));
+      return res.json({ success: true, models });
+    }
+
+    if (provider === 'anthropic') {
+      const targetBaseUrl = baseUrl || 'https://api.anthropic.com';
+      const url = `${targetBaseUrl}/v1/models`;
+      const headers = {
+        'x-api-key': apiKey || '',
+        'anthropic-version': '2023-06-01',
+        'Content-Type': 'application/json'
+      };
+      const response = await fetch(url, { headers });
+      if (!response.ok) {
+        const errTxt = await response.text();
+        return res.json({ success: false, error: `Anthropic API error ${response.status}: ${errTxt.substring(0, 150)}` });
+      }
+      const data = await response.json();
+      const models = (data.data || []).map(m => ({
+        name: m.display_name || m.model_id,
+        value: m.model_id
+      }));
+      return res.json({ success: true, models });
+    }
+
+    // OpenAI and compatible (LM Studio, llama.cpp)
+    const targetBaseUrl = baseUrl || 'https://api.openai.com/v1';
+    const cleanBase = targetBaseUrl.endsWith('/') ? targetBaseUrl.slice(0, -1) : targetBaseUrl;
+    const url = `${cleanBase}/models`;
+    const headers = {};
+    if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+    const response = await fetch(url, { headers });
+    if (!response.ok) {
+      const errTxt = await response.text();
+      return res.json({ success: false, error: `API error ${response.status}: ${errTxt.substring(0, 150)}` });
+    }
+    const data = await response.json();
+    const models = (data.data || []).map(m => ({
+      name: m.id,
+      value: m.id
+    }));
+    return res.json({ success: true, models });
+
+  } catch (err) {
+    res.json({ success: false, error: `Error fetching models: ${err.message}` });
+  }
+});
+
+// Ollama: load (warm up) a model into memory
 
 // Ollama: load (warm up) a model into memory
 app.post('/api/v1/ai/ollama/load', async (req, res) => {

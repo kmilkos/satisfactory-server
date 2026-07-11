@@ -1310,8 +1310,8 @@
                             <div class="space-y-2">
                                 <div class="flex items-center justify-between">
                                     <label class="font-label-caps text-on-surface-variant text-[10px] font-bold block">SELECT MODEL PRESET</label>
-                                    <button id="ollama-refresh-btn" onclick="handleAiProviderChange('ollama')" style="display:none" class="flex items-center gap-1 text-[9px] font-bold text-primary hover:text-primary-container transition-colors px-2 py-0.5 border border-primary/30 hover:border-primary/60">
-                                        <span class="material-symbols-outlined text-[11px]">refresh</span> REFRESH
+                                    <button id="ai-models-refresh-btn" onclick="updateAvailableModels()" class="flex items-center gap-1 text-[9px] font-bold text-primary hover:text-primary-container transition-colors px-2 py-0.5 border border-primary/30 hover:border-primary/60">
+                                        <span class="material-symbols-outlined text-[11px]">refresh</span> REFRESH MODELS
                                     </button>
                                 </div>
                                 <select id="ai-model-preset" onchange="handleAiModelPresetChange(this.value)" class="w-full bg-background border border-outline-variant text-on-surface font-code-sm p-3 focus:ring-1 focus:ring-primary focus:outline-none appearance-none cursor-pointer">

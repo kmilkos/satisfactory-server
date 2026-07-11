@@ -2214,51 +2214,8 @@ async function handleAiProviderChange(provider) {
       : 'text-[9px] font-bold px-2 py-0.5 bg-primary/20 text-primary border border-primary/30 uppercase tracking-wider ml-auto';
   }
 
-  // For Ollama: fetch live models from local instance
-  const refreshBtn = document.getElementById('ollama-refresh-btn');
-  if (refreshBtn) refreshBtn.style.display = provider === 'ollama' ? '' : 'none';
-
   if (provider === 'ollama') {
-    if (selectPreset) {
-      selectPreset.innerHTML = `<option value="" disabled selected>⏳ Fetching models from Ollama...</option>`;
-    }
-    try {
-      const baseUrl = urlInput?.value || 'http://localhost:11434';
-      const res = await fetch(`/api/v1/ai/ollama/models?baseUrl=${encodeURIComponent(baseUrl)}`);
-      const data = await res.json();
-
-      if (data.success && data.models.length > 0) {
-        if (selectPreset) {
-          selectPreset.innerHTML = data.models.map(m => {
-            const label = m.size ? `${m.name}  [${m.size}]` : m.name;
-            return `<option value="${m.value}">${label}</option>`;
-          }).join('');
-
-          // Auto-select the currently loaded/running model if available
-          const toSelect = data.activeModel || data.models[0].value;
-          selectPreset.value = toSelect;
-          handleAiModelPresetChange(toSelect);
-
-          // Show active model badge
-          if (data.activeModel) {
-            const activeBadge = document.getElementById('ollama-active-badge');
-            if (activeBadge) {
-              activeBadge.textContent = `🟢 Loaded: ${data.activeModel}`;
-              activeBadge.style.display = '';
-            }
-          }
-        }
-      } else {
-        const errMsg = data.error || 'No models found. Pull a model with: ollama pull <model>';
-        if (selectPreset) {
-          selectPreset.innerHTML = `<option value="" disabled selected>⚠ ${errMsg}</option>`;
-        }
-      }
-    } catch (err) {
-      if (selectPreset) {
-        selectPreset.innerHTML = `<option value="" disabled selected>⚠ Cannot reach Ollama: ${err.message}</option>`;
-      }
-    }
+    updateAvailableModels();
     return;
   }
 
@@ -2274,6 +2231,62 @@ async function handleAiProviderChange(provider) {
   // Hide the Ollama active model badge
   const activeBadge = document.getElementById('ollama-active-badge');
   if (activeBadge) activeBadge.style.display = 'none';
+}
+
+async function updateAvailableModels() {
+  const provider = document.getElementById('ai-provider-select')?.value || 'gemini';
+  const baseUrl = document.getElementById('ai-base-url')?.value || '';
+  const apiKey = document.getElementById('ai-api-key')?.value || '';
+  const selectPreset = document.getElementById('ai-model-preset');
+  const refreshBtn = document.getElementById('ai-models-refresh-btn');
+
+  if (!selectPreset) return;
+
+  // Set loading state on refresh button
+  if (refreshBtn) {
+    refreshBtn.disabled = true;
+    refreshBtn.innerHTML = `<span class="material-symbols-outlined text-[11px] animate-spin">sync</span> FETCHING...`;
+  }
+
+  selectPreset.innerHTML = `<option value="" disabled selected>⏳ Fetching available models for ${provider}...</option>`;
+
+  try {
+    const res = await fetch(`/api/v1/ai/models?provider=${provider}&baseUrl=${encodeURIComponent(baseUrl)}&apiKey=${encodeURIComponent(apiKey)}`);
+    const data = await res.json();
+
+    if (data.success && data.models.length > 0) {
+      selectPreset.innerHTML = data.models.map(m => {
+        const label = m.size ? `${m.name}  [${m.size}]` : m.name;
+        return `<option value="${m.value}">${label}</option>`;
+      }).join('');
+
+      // Auto-select the active model if returned (Ollama), or the first model
+      const toSelect = data.activeModel || data.models[0].value;
+      selectPreset.value = toSelect;
+      handleAiModelPresetChange(toSelect);
+
+      // Handle active model badge for Ollama
+      const activeBadge = document.getElementById('ollama-active-badge');
+      if (activeBadge) {
+        if (provider === 'ollama' && data.activeModel) {
+          activeBadge.textContent = `🟢 Loaded: ${data.activeModel}`;
+          activeBadge.style.display = '';
+        } else {
+          activeBadge.style.display = 'none';
+        }
+      }
+    } else {
+      const errMsg = data.error || 'No models found.';
+      selectPreset.innerHTML = `<option value="" disabled selected>⚠ ${errMsg}</option>`;
+    }
+  } catch (err) {
+    selectPreset.innerHTML = `<option value="" disabled selected>⚠ Connection failed: ${err.message}</option>`;
+  } finally {
+    if (refreshBtn) {
+      refreshBtn.disabled = false;
+      refreshBtn.innerHTML = `<span class="material-symbols-outlined text-[11px]">refresh</span> REFRESH MODELS`;
+    }
+  }
 }
 
 function handleAiModelPresetChange(value) {
