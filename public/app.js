@@ -2150,9 +2150,10 @@ const providerConfig = {
   gemini: {
     baseUrl: 'https://generativelanguage.googleapis.com',
     models: [
-      { name: 'Gemini 1.5 Pro', value: 'gemini-1.5-pro' },
-      { name: 'Gemini 1.5 Flash', value: 'gemini-1.5-flash' },
-      { name: 'Gemini Ultra 1.0', value: 'gemini-1.0-pro' }
+      { name: 'Gemini 2.5 Flash (Recommended)', value: 'gemini-2.5-flash' },
+      { name: 'Gemini 2.5 Pro', value: 'gemini-2.5-pro' },
+      { name: 'Gemini 2.0 Flash', value: 'gemini-2.0-flash' },
+      { name: 'Gemini 1.5 Flash', value: 'gemini-1.5-flash' }
     ]
   },
   openai: {
@@ -2406,19 +2407,28 @@ function loadAiSettings() {
       const providerSel = document.getElementById('ai-provider-select');
       if (providerSel) providerSel.value = config.provider || 'gemini';
 
-      // Trigger provider change to update model list & UI
-      handleAiProviderChange(config.provider || 'gemini');
-
       const urlInput = document.getElementById('ai-base-url');
       if (urlInput && config.baseUrl) urlInput.value = config.baseUrl;
 
       const apiKeyInput = document.getElementById('ai-api-key');
       if (apiKeyInput && config.apiKey) apiKeyInput.value = config.apiKey;
 
+      // Trigger provider change to update model list & UI
+      handleAiProviderChange(config.provider || 'gemini');
+
       const modelPreset = document.getElementById('ai-model-preset');
       if (modelPreset && config.model) {
         const opt = modelPreset.querySelector(`option[value="${config.model}"]`);
-        if (opt) modelPreset.value = config.model;
+        if (opt) {
+          modelPreset.value = config.model;
+        } else {
+          // Dynamically append the saved model to prevent select from resetting
+          const newOpt = document.createElement('option');
+          newOpt.value = config.model;
+          newOpt.textContent = `${config.model} (Saved)`;
+          modelPreset.appendChild(newOpt);
+          modelPreset.value = config.model;
+        }
       }
 
       const customModel = document.getElementById('ai-custom-model');
