@@ -2082,15 +2082,6 @@ function handleCalibrationChange(key, value) {
   }
 }
 
-function handleModelChange(modelName, buttonEl) {
-  handleCalibrationChange('cognitiveModel', modelName);
-  
-  document.querySelectorAll('.model-btn').forEach(btn => {
-    btn.className = 'model-btn text-left px-3 py-2 bg-surface-container-high text-on-surface-variant text-xs border-l-4 border-transparent hover:bg-surface-bright transition-colors';
-  });
-  buttonEl.className = 'model-btn text-left px-3 py-2 bg-primary-container text-on-primary text-xs font-bold border-l-4 border-on-primary';
-}
-
 // Power actions controller
 function triggerServerPower(action) {
   postApi(`/api/v1/server/${action}`, {}).then(res => {
@@ -2602,6 +2593,16 @@ function selectPersona(personaKey) {
 
   // Update terminal header persona indicator
   updateTerminalPersonaTag(persona);
+
+  // Highlight active sidebar persona button
+  document.querySelectorAll('.persona-btn').forEach(btn => {
+    btn.className = 'persona-btn text-left px-3 py-2 bg-surface-container-high text-on-surface-variant text-xs border-l-4 border-transparent hover:bg-surface-bright transition-colors';
+  });
+  const sidebarBtn = document.getElementById(`sidebar-persona-btn-${personaKey}`);
+  if (sidebarBtn) {
+    const borderClass = personaKey === 'ada' ? 'border-primary' : (personaKey === 'shroud' ? 'border-error' : 'border-tertiary');
+    sidebarBtn.className = `persona-btn text-left px-3 py-2 bg-primary-container text-on-primary text-xs font-bold border-l-4 ${borderClass}`;
+  }
 }
 
 function updateTerminalPersonaTag(persona) {

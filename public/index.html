@@ -1171,13 +1171,13 @@
                         </div>
                     </section>
                     
-                    <!-- Model Selector -->
+                    <!-- Active Persona Quick Switcher -->
                     <section>
-                        <h3 class="text-label-caps text-outline mb-2 text-[10px] font-bold">NEURAL ARCHITECTURE</h3>
-                        <div class="flex flex-col gap-1">
-                            <button onclick="handleModelChange('FICS-ORACLE-3.5', this)" class="model-btn text-left px-3 py-2 bg-primary-container text-on-primary text-xs font-bold border-l-4 border-on-primary">FICS-ORACLE-3.5</button>
-                            <button onclick="handleModelChange('FICS-MAINFRAME-V2', this)" class="model-btn text-left px-3 py-2 bg-surface-container-high text-on-surface-variant text-xs border-l-4 border-transparent hover:bg-surface-bright transition-colors">FICS-MAINFRAME-V2</button>
-                            <button onclick="handleModelChange('LEGACY-COGNITION-1.0', this)" class="model-btn text-left px-3 py-2 bg-surface-container-high text-on-surface-variant text-xs border-l-4 border-transparent hover:bg-surface-bright transition-colors">LEGACY-COGNITION-1.0</button>
+                        <h3 class="text-label-caps text-outline mb-2 text-[10px] font-bold">ACTIVE NEURAL PERSONA</h3>
+                        <div class="flex flex-col gap-1" id="sidebar-persona-selector">
+                            <button id="sidebar-persona-btn-ada" onclick="selectPersona('ada')" class="persona-btn text-left px-3 py-2 bg-surface-container-high text-on-surface-variant text-xs border-l-4 border-transparent hover:bg-surface-bright transition-colors">A.D.A.</button>
+                            <button id="sidebar-persona-btn-shroud" onclick="selectPersona('shroud')" class="persona-btn text-left px-3 py-2 bg-surface-container-high text-on-surface-variant text-xs border-l-4 border-transparent hover:bg-surface-bright transition-colors">THE SHROUD</button>
+                            <button id="sidebar-persona-btn-unit7" onclick="selectPersona('unit7')" class="persona-btn text-left px-3 py-2 bg-surface-container-high text-on-surface-variant text-xs border-l-4 border-transparent hover:bg-surface-bright transition-colors">UNIT-7</button>
                         </div>
                     </section>
                     
