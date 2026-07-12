@@ -2861,8 +2861,10 @@ function onRuleActionChange() {
   const label = document.getElementById('rule-param-label');
   const paramInput = document.getElementById('rule-param');
   const guideContainer = document.getElementById('rule-action-guide-container');
+  const personasContainer = document.getElementById('rule-personas-selection-container');
   
   if (action === 'send_chat') {
+    if (personasContainer) personasContainer.classList.remove('hidden');
     label.innerText = 'CHAT MESSAGE TEMPLATE (supports variables)';
     paramInput.placeholder = 'ALERT: Grid failure on circuit {circuitGroupID}!';
     if (guideContainer) {
@@ -2891,6 +2893,7 @@ function onRuleActionChange() {
       `;
     }
   } else if (action === 'toggle_switch') {
+    if (personasContainer) personasContainer.classList.add('hidden');
     label.innerText = 'POWER SWITCH IDENTIFIER (Priority Switch Name/ID)';
     paramInput.placeholder = 'e.g. priority_switch_3 or Sector B Switch';
     if (guideContainer) {
@@ -2942,6 +2945,10 @@ function renderAutomationRules() {
       toggle_switch: 'Disable Power Switch'
     };
     
+    const personaText = rule.action === 'send_chat' 
+      ? `<div><strong class="text-outline">RESPONDERS:</strong> ${(rule.personas && rule.personas.length > 0) ? rule.personas.map(p => p.toUpperCase()).join(', ') : 'ADA'}</div>`
+      : '';
+    
     return `
       <div class="bg-surface-container-high border ${rule.enabled ? 'border-primary/40' : 'border-outline-variant'} p-4 rounded flex items-center justify-between transition-all duration-300">
           <div>
@@ -2952,7 +2959,8 @@ function renderAutomationRules() {
               <div class="grid grid-cols-2 gap-x-6 gap-y-1 text-[10px] font-code-sm text-on-surface-variant mt-2">
                   <div><strong class="text-outline">TRIGGER:</strong> ${triggerNames[rule.trigger] || rule.trigger}</div>
                   <div><strong class="text-outline">ACTION:</strong> ${actionNames[rule.action] || rule.action}</div>
-                  <div class="col-span-2"><strong class="text-outline">PARAMETER:</strong> <code class="text-on-surface bg-surface-container px-1 py-0.5">${rule.parameter}</code></div>
+                  ${personaText}
+                  <div class="col-span-2 mt-1"><strong class="text-outline">PARAMETER:</strong> <code class="text-on-surface bg-surface-container px-1 py-0.5">${rule.parameter}</code></div>
               </div>
           </div>
           <div class="flex items-center gap-3">
@@ -3019,13 +3027,24 @@ async function addAutomationRule() {
     return;
   }
   
+  const personas = [];
+  if (action === 'send_chat') {
+    if (document.getElementById('rule-persona-ada').checked) personas.push('ada');
+    if (document.getElementById('rule-persona-shroud').checked) personas.push('shroud');
+    if (document.getElementById('rule-persona-unit7').checked) personas.push('unit7');
+    if (personas.length === 0) {
+      personas.push(activePersona || 'ada');
+    }
+  }
+
   const newRule = {
     id: 'rule_' + Math.random().toString(36).substring(2, 9),
     name,
     enabled: true,
     trigger,
     action,
-    parameter
+    parameter,
+    personas
   };
   
   automationRules.push(newRule);

@@ -2312,7 +2312,7 @@ function loadAutomationRules() {
 }
 loadAutomationRules();
 
-function triggerAutomationEvent(trigger, data) {
+async function triggerAutomationEvent(trigger, data) {
   const timestamp = new Date().toISOString();
   const eventId = 'evt_' + Math.random().toString(36).substring(2, 11);
   let eventDesc = '';
@@ -2345,28 +2345,98 @@ function triggerAutomationEvent(trigger, data) {
   const matchingRules = automationRules.filter(r => r.enabled && r.trigger === trigger);
   const actions = [];
 
-  matchingRules.forEach(rule => {
+  for (const rule of matchingRules) {
     let formattedText = rule.parameter || '';
     Object.keys(data).forEach(key => {
       formattedText = formattedText.replace(new RegExp(`{${key}}`, 'g'), data[key]);
     });
 
     if (rule.action === 'send_chat') {
-      actions.push(`Send Chat: "${formattedText}"`);
-      frmPost('/sendChatMessage', {
-        message: formattedText.substring(0, 512),
-        sender: 'FICSIT A.I.',
-        color: { r: 1.0, g: 0.5, b: 0.0, a: 1.0 }
-      }).catch(err => console.error('[Send Chat failed]', err.message));
+      const personasRequested = rule.personas && rule.personas.length > 0 ? rule.personas : [frmActivePersona || 'ada'];
+      actions.push(`Send Chat [${personasRequested.join(', ')}]: "${formattedText}"`);
+
+      let parsed = null;
+
+      // Try to generate AI responses in character
+      if (frmConfig.enabled && frmActiveAiConfig) {
+        try {
+          const systemPrompt = `You are a Satisfactory Dedicated Server AI Coordinator. An event has occurred on the server:
+"${eventDesc}"
+
+Please generate the in-character reaction messages for the following personas:
+${personasRequested.map(p => `- ${p.toUpperCase()}`).join('\n')}
+
+Personality definitions:
+- ADA: Corporate, efficient, passive-aggressive, loyal to FICSIT. Speaks to the Pioneer.
+- THE SHROUD: Ancient alien presence, cosmic, cryptic, drawn to the warmth of machines. Speaks in lowercase fragments.
+- UNIT-7: Autonomous ops assistant, zero filler, ruthlessly efficient, short bullet points.
+
+Return your response strictly as a JSON object matching this schema:
+{
+  ${personasRequested.map(p => `"${p}": "reaction text"`).join(',\n  ')}
+}
+Ensure you do NOT include any markdown code blocks, backticks, or other text outside the JSON. Return only valid raw JSON.`;
+
+          const chatRes = await fetch(`http://localhost:${process.env.PORT || 3030}/api/v1/ai/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              provider: frmActiveAiConfig.provider,
+              baseUrl: frmActiveAiConfig.baseUrl,
+              apiKey: frmActiveAiConfig.apiKey,
+              model: frmActiveAiConfig.model,
+              systemPrompt: systemPrompt,
+              message: `Generate reactions for the event: ${eventDesc}`
+            })
+          });
+          const chatData = await chatRes.json();
+          if (chatData.success && chatData.reply) {
+            let replyText = chatData.reply.trim();
+            if (replyText.startsWith('```')) {
+              replyText = replyText.replace(/^```[a-zA-Z]*\n/, '').replace(/\n```$/, '');
+            }
+            replyText = replyText.trim();
+            parsed = JSON.parse(replyText);
+          }
+        } catch (err) {
+          console.error('[Automation Rule AI Generation failed]', err.message);
+        }
+      }
+
+      // Send chat messages for each persona
+      for (const personaKey of personasRequested) {
+        const personaNames = { ada: 'A.D.A.', shroud: 'THE SHROUD', unit7: 'UNIT-7' };
+        const senderName = personaNames[personaKey] || 'AI';
+        const color = personaChatColors[personaKey] || { r: 1, g: 1, b: 1, a: 1 };
+        
+        let messageToSend = formattedText;
+        if (parsed && parsed[personaKey]) {
+          messageToSend = parsed[personaKey];
+        }
+
+        await frmPost('/sendChatMessage', {
+          message: messageToSend.substring(0, 512),
+          sender: senderName,
+          color
+        }).catch(err => console.error(`[Send Chat failed for ${senderName}]`, err.message));
+        
+        // Broadcast response back to client
+        broadcastToWs('game_chat_ai_response', {
+          persona: personaKey,
+          sender: senderName,
+          message: messageToSend,
+          timestamp: Math.floor(Date.now() / 1000)
+        });
+      }
     } else if (rule.action === 'toggle_switch') {
       const switchId = rule.parameter;
       actions.push(`Disable Switch: "${switchId}"`);
-      frmPost('/setSwitches', {
+      await frmPost('/setSwitches', {
         ID: switchId,
         status: false
       }).catch(err => console.error('[Set Switch failed]', err.message));
     }
-  });
+  }
 
   if (actions.length > 0) {
     newLog.actionTaken = actions.join(' | ');

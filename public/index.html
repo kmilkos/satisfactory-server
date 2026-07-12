@@ -1502,6 +1502,24 @@
                                 <textarea id="rule-param" rows="3" placeholder="ALERT: Grid failure on circuit {circuitGroupID}!"
                                     class="w-full bg-surface-container-lowest border border-outline-variant text-on-surface text-[11px] px-3 py-2 font-code-sm focus:border-primary focus:ring-0 outline-none"></textarea>
                             </div>
+                            <!-- AI Persona selection (hidden/shown dynamically) -->
+                            <div id="rule-personas-selection-container">
+                                <label class="block text-[9px] font-bold font-label-caps text-on-surface-variant mb-1.5">AI PERSONA(S) TO RESPOND</label>
+                                <div class="flex gap-4 items-center bg-surface-container-lowest border border-outline-variant p-2.5 rounded">
+                                    <label class="flex items-center gap-1.5 cursor-pointer text-xs font-code-sm">
+                                        <input type="checkbox" id="rule-persona-ada" value="ada" checked class="rounded border-outline-variant text-primary bg-zinc-950 focus:ring-0 focus:ring-offset-0 focus:outline-none w-3.5 h-3.5">
+                                        <span class="text-primary font-bold">A.D.A.</span>
+                                    </label>
+                                    <label class="flex items-center gap-1.5 cursor-pointer text-xs font-code-sm">
+                                        <input type="checkbox" id="rule-persona-shroud" value="shroud" class="rounded border-outline-variant text-error bg-zinc-950 focus:ring-0 focus:ring-offset-0 focus:outline-none w-3.5 h-3.5">
+                                        <span class="text-error font-bold">THE SHROUD</span>
+                                    </label>
+                                    <label class="flex items-center gap-1.5 cursor-pointer text-xs font-code-sm">
+                                        <input type="checkbox" id="rule-persona-unit7" value="unit7" class="rounded border-outline-variant text-tertiary bg-zinc-950 focus:ring-0 focus:ring-offset-0 focus:outline-none w-3.5 h-3.5">
+                                        <span class="text-tertiary font-bold">UNIT-7</span>
+                                    </label>
+                                </div>
+                            </div>
                             <!-- Dynamic Guide Container -->
                             <div id="rule-action-guide-container" class="p-3 bg-surface-container-low border border-outline-variant/30 text-[10px] text-on-surface-variant font-code-sm rounded space-y-1.5 leading-relaxed">
                                 <!-- Initialized via JavaScript -->
