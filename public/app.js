@@ -5,6 +5,7 @@ let currentTab = 'dashboard';
 let selectedModId = null;
 let automationRules = [];
 let automationLogs = [];
+let personaMemories = {};
 
 
 // SMR Live Data State
@@ -181,6 +182,17 @@ function handleWsMessage(type, data) {
         if (automationLogs.length > 100) automationLogs.pop();
         renderAutomationLogs();
       }
+      break;
+
+    case 'persona_memories':
+      personaMemories = data || {};
+      renderPersonaMemories();
+      break;
+
+    case 'persona_memory_update':
+      if (!personaMemories[data.personaKey]) personaMemories[data.personaKey] = {};
+      personaMemories[data.personaKey][data.sender] = data.memories;
+      renderPersonaMemories();
       break;
     // ─────────────────────────────────────────────────────────────────────────
   }
@@ -2017,7 +2029,8 @@ async function sendTerminalShellCommand() {
         model: activeAiConfig.model,
         systemPrompt: activeAiConfig.systemPrompt,
         message: val,
-        temperature: serverState ? serverState.aiTemperature : 0.78
+        temperature: serverState ? serverState.aiTemperature : 0.78,
+        playerName: 'PIONEER'
       })
     });
     const data = await res.json();
@@ -2602,6 +2615,32 @@ function selectPersona(personaKey) {
     const borderClass = personaKey === 'ada' ? 'border-primary' : (personaKey === 'shroud' ? 'border-error' : 'border-slate-400');
     sidebarBtn.className = `persona-btn text-left px-3 py-2 bg-primary-container text-on-primary text-xs font-bold border-l-4 ${borderClass}`;
   }
+
+  renderPersonaMemories();
+}
+
+function renderPersonaMemories() {
+  const container = document.getElementById('sidebar-memories-container');
+  if (!container) return;
+
+  const memories = personaMemories[activePersona] || {};
+  const entries = Object.entries(memories).filter(([player, list]) => list && list.length > 0);
+
+  if (entries.length === 0) {
+    container.innerHTML = `<span class="text-outline italic">No records stored for active pioneers.</span>`;
+    return;
+  }
+
+  container.innerHTML = entries.map(([player, list]) => {
+    return `
+      <div class="border-b border-outline-variant/20 pb-2 mb-2 last:border-0 last:pb-0 last:mb-0">
+        <div class="font-bold text-primary mb-1 uppercase tracking-wider text-[9px]">${player}</div>
+        <ul class="list-disc list-inside space-y-0.5 text-on-surface-variant font-code-sm text-[9px]">
+          ${list.map(m => `<li>${escHtml(m)}</li>`).join('')}
+        </ul>
+      </div>
+    `;
+  }).join('');
 }
 
 function updateTerminalPersonaTag(persona) {

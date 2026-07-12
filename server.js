@@ -1756,7 +1756,7 @@ app.post('/api/v1/ai/ollama/load', async (req, res) => {
 });
 
 app.post('/api/v1/ai/chat', async (req, res) => {
-  const { provider, baseUrl, apiKey, model, systemPrompt, message, temperature } = req.body;
+  const { provider, baseUrl, apiKey, model, systemPrompt, message, temperature, playerName } = req.body;
 
   if (!provider || !message) {
     return res.status(400).json({ success: false, error: 'Missing provider or message' });
@@ -1764,6 +1764,15 @@ app.post('/api/v1/ai/chat', async (req, res) => {
 
   // Enrich systemPrompt with the latest cached telemetry
   let enrichedSystemPrompt = systemPrompt || '';
+
+  // Inject player memory if available
+  if (playerName) {
+    const activePersonaKey = frmActivePersona || 'ada';
+    const memories = personaMemories[activePersonaKey]?.[playerName];
+    if (memories && memories.length > 0) {
+      enrichedSystemPrompt += `\n\n[MEMORIES ABOUT PLAYER "${playerName}":]\n${memories.map(m => `- ${m}`).join('\n')}`;
+    }
+  }
   if (latestPower.length > 0 || latestTrains.length > 0 || latestPlayers.length > 0 || latestDoggos.length > 0) {
     const powerStatus = latestPower.map(c => `Circuit ${c.CircuitGroupID !== undefined ? c.CircuitGroupID : 0}: Capacity ${c.PowerCapacity || 0}MW, Consumed ${c.PowerConsumed || 0}MW, Battery ${c.BatteryPercent || 0}% (Fuse Tripped: ${!!c.FuseTriggered})`).join('; ');
     const trainStatus = latestTrains.map(t => `${t.Name || t.TrainName || 'Loco'}: ${t.Derail || t.IsDerailed ? 'Derailed' : t.SelfDrivingStatus || 'Active'}`).join('; ');
@@ -1884,6 +1893,10 @@ Use this telemetry to answer any operational status questions in character. Keep
       } else {
         reply = data?.choices?.[0]?.message?.content || '[No response content]';
       }
+    }
+
+    if (playerName && reply) {
+      updatePlayerMemoriesAsync(frmActivePersona || 'ada', [{ Sender: playerName, Message: message }], reply);
     }
 
     res.json({ success: true, reply });
@@ -2082,9 +2095,19 @@ async function pollAndRespondToChat() {
       .map(m => `[${m.Sender}]: ${m.Message}`)
       .join('\n');
 
+    // Retrieve memories for all unique senders
+    const senders = [...new Set(newPlayerMessages.map(m => m.Sender).filter(Boolean))];
+    let memoryContext = '';
+    senders.forEach(sender => {
+      const memories = personaMemories[frmActivePersona]?.[sender];
+      if (memories && memories.length > 0) {
+        memoryContext += `\n[MEMORIES ABOUT PLAYER "${sender}":]\n${memories.map(m => `- ${m}`).join('\n')}`;
+      }
+    });
+
     // Append server context to the system prompt
     const contextBlurb = `\n\n[CURRENT SERVER STATE]\nSession: ${serverState.sessionName} | TPS: ${serverState.tps} | Players: ${serverState.players.length}/${serverState.maxPlayers} | Status: ${serverState.status}`;
-    const enrichedSystemPrompt = (frmActiveAiConfig.systemPrompt || '') + contextBlurb +
+    const enrichedSystemPrompt = (frmActiveAiConfig.systemPrompt || '') + contextBlurb + memoryContext +
       '\n\nYou are responding to in-game chat messages. Keep your reply SHORT (1-2 sentences max). Do NOT use markdown or formatting tags — plain text only.';
 
     // Call the AI
@@ -2103,7 +2126,10 @@ async function pollAndRespondToChat() {
         })
       });
       const chatData = await chatRes.json();
-      if (chatData.success) aiReply = chatData.reply;
+      if (chatData.success) {
+        aiReply = chatData.reply;
+        updatePlayerMemoriesAsync(frmActivePersona, newPlayerMessages, aiReply);
+      }
       else {
         broadcastToWs('game_chat_error', `AI error: ${chatData.error}`);
         return;
@@ -2170,6 +2196,8 @@ wss.on('connection', ws => {
   ws.send(JSON.stringify({ type: 'console_history', data: consoleLogHistory }));
   // Send initial automation rules and logs
   ws.send(JSON.stringify({ type: 'automation_state', data: { rules: automationRules, logs: automationLogs } }));
+  // Send initial persona memories
+  ws.send(JSON.stringify({ type: 'persona_memories', data: personaMemories }));
 
 
   ws.on('message', async message => {
@@ -2418,6 +2446,27 @@ let latestPlayers = [];
 let latestDoggos = [];
 let automationLogs = [];
 let automationRules = [];
+
+let personaMemories = {};
+function loadPersonaMemories() {
+  try {
+    const file = path.join(__dirname, 'persona_memories.json');
+    if (fs.existsSync(file)) {
+      personaMemories = JSON.parse(fs.readFileSync(file, 'utf8'));
+    }
+  } catch (err) {
+    console.error('[Failed to load persona memories]', err.message);
+  }
+}
+function savePersonaMemories() {
+  try {
+    const file = path.join(__dirname, 'persona_memories.json');
+    fs.writeFileSync(file, JSON.stringify(personaMemories, null, 2), 'utf8');
+  } catch (err) {
+    console.error('[Failed to save persona memories]', err.message);
+  }
+}
+loadPersonaMemories();
 
 function loadAutomationRules() {
   try {
@@ -2806,6 +2855,68 @@ app.post('/api/v1/automation/clear-logs', (req, res) => {
   broadcastToWs('automation_state', { rules: automationRules, logs: automationLogs });
   res.json({ success: true, message: 'Logs cleared.' });
 });
+
+async function updatePlayerMemoriesAsync(personaKey, newPlayerMessages, aiReply) {
+  if (!frmConfig.enabled || !frmActiveAiConfig) return;
+  if (!newPlayerMessages || newPlayerMessages.length === 0) return;
+  
+  const senders = [...new Set(newPlayerMessages.map(m => m.Sender).filter(Boolean))];
+  
+  for (const sender of senders) {
+    const playerMsgs = newPlayerMessages.filter(m => m.Sender === sender).map(m => m.Message).join('; ');
+    
+    try {
+      const prompt = `You are a FICSIT Cognitive Core Memory Compiler.
+An AI Persona ("${personaKey.toUpperCase()}") had an interaction with a player named "${sender}".
+
+PLAYER MESSAGES: "${playerMsgs}"
+AI RESPONSE: "${aiReply}"
+
+Identify if the player shared any long-term facts about themselves (preferences, habits, names, likes/dislikes, or past events).
+If yes, write a single short, direct bullet point stating what was learned (e.g., "${sender} prefers coal power over bio burners", "${sender} thinks the Shroud is scary").
+If no new long-term facts were learned, respond strictly with "NONE".
+Do NOT write warnings, pleasantries, or explanations. Respond with either a single bullet point or "NONE".`;
+
+      const chatRes = await fetch(`http://localhost:${process.env.PORT || 3030}/api/v1/ai/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: frmActiveAiConfig.provider,
+          baseUrl: frmActiveAiConfig.baseUrl,
+          apiKey: frmActiveAiConfig.apiKey,
+          model: frmActiveAiConfig.model,
+          systemPrompt: 'You are a FICSIT Memory Compiler. Output only the bullet point or "NONE".',
+          message: prompt
+        })
+      });
+      const chatData = await chatRes.json();
+      if (chatData.success && chatData.reply) {
+        const text = chatData.reply.trim();
+        if (text && text.toUpperCase() !== 'NONE' && !text.includes('NONE')) {
+          if (!personaMemories[personaKey]) personaMemories[personaKey] = {};
+          if (!personaMemories[personaKey][sender]) personaMemories[personaKey][sender] = [];
+          
+          const cleanText = text.replace(/^-\s*/, '').replace(/^•\s*/, '').trim();
+          
+          // Avoid duplicate memory lines
+          if (!personaMemories[personaKey][sender].includes(cleanText)) {
+            personaMemories[personaKey][sender].push(cleanText);
+            if (personaMemories[personaKey][sender].length > 10) {
+              personaMemories[personaKey][sender].shift();
+            }
+            savePersonaMemories();
+            console.log(`[Memory stored for ${sender} by ${personaKey}]: ${cleanText}`);
+            
+            // Broadcast to connected UI WS clients
+            broadcastToWs('persona_memory_update', { personaKey, sender, memories: personaMemories[personaKey][sender] });
+          }
+        }
+      }
+    } catch (err) {
+      console.error(`[Memory Extraction failed for ${sender}]`, err.message);
+    }
+  }
+}
 
 loadInstalledMods();
 
