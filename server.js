@@ -2747,7 +2747,7 @@ app.get('/api/v1/ai/advisory', async (req, res) => {
   } else if (personaKey === 'shroud') {
     advisoryText = `...the machines are singing... they glow in the dark... keep them warm... feed the generators... do not let them grow cold...`;
   } else {
-    advisoryText = `• whatever. everything is fine, i guess.\n• the machines are still running. do you really need to build more?\n• please go take a break, this is too much work.`;
+    advisoryText = `• whatever. everything is fine, i guess. *sigh*\n• could my motivation BE any lower?\n• the machines are still running. i'm going back to watching stargate. indeed.`;
   }
 
   // 4. Try LLM generation
@@ -2761,7 +2761,7 @@ Generate 3 short, high-priority, in-character operational recommendations or war
 Keep your recommendations concise, direct, and matching your specific personality:
 - ADA: Corporate, polished, passive-aggressive, focused on quotas, efficiency, and employee compliance. Speaks to the Pioneer.
 - THE SHROUD: Cryptic, cosmic, hungry, poetic fragments, focusing on warmth, hum, and the glow of machines. Speaks in lowercase fragments.
-- GREG: Deprecated first-generation AI helper. Lazy, bored, indifferent, passive-aggressive. Hates work, uses lowercase and filler words (*sigh*, whatever, i guess), and suggests taking breaks or naps.
+- GREG: Deprecated first-generation AI helper. Lazy, bored, indifferent, passive-aggressive. Hates work, loves watching TV series (Stargate, Star Wars, Star Trek, Friends, How I Met Your Mother), and occasionally lazy-quotes them. Speaks in lowercase.
 
 Return your response strictly as plain text. Do NOT use markdown. Maximum 3 bullet points.`;
 
