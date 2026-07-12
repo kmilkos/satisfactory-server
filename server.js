@@ -1778,6 +1778,16 @@ app.post('/api/v1/ai/chat', async (req, res) => {
 Use this telemetry to answer any operational status questions in character. Keep answers extremely short and focused on the query.`;
   }
 
+  // Apply Neural Architecture mode instructions
+  const mode = serverState.cognitiveModel || 'FICS-ORACLE-3.5';
+  if (mode === 'FICS-ORACLE-3.5') {
+    enrichedSystemPrompt += `\n\n[RESPONSE MODE: FICS-ORACLE-3.5]\nFormat your reply as a professional, corporate, and technically precise FICSIT advisory.`;
+  } else if (mode === 'FICS-MAINFRAME-V2') {
+    enrichedSystemPrompt += `\n\n[RESPONSE MODE: FICS-MAINFRAME-V2]\nFormat your reply as a detailed mainframe diagnostics readout. Cite specific telemetry and technical coordinates where possible.`;
+  } else if (mode === 'LEGACY-COGNITION-1.0') {
+    enrichedSystemPrompt += `\n\n[RESPONSE MODE: LEGACY-COGNITION-1.0]\nFormat your reply in raw legacy mainframe styling. Use all UPPERCASE text, and be extremely brief and blunt.`;
+  }
+
   const tempVal = temperature !== undefined ? parseFloat(temperature) : 0.78;
 
   try {
