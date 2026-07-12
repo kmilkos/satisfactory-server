@@ -1905,7 +1905,10 @@ function frmGet(path) {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        ...(frmConfig.authToken ? { 'X-FRM-Authorization': frmConfig.authToken } : {})
+        ...(frmConfig.authToken ? { 
+          'X-FRM-Authorization': frmConfig.authToken,
+          'X-API-Key': frmConfig.authToken 
+        } : {})
       },
       timeout: 4000
     };
@@ -1935,7 +1938,10 @@ function frmPost(path, body) {
       headers: {
         'Content-Type': 'application/json',
         'Content-Length': Buffer.byteLength(payload),
-        ...(frmConfig.authToken ? { 'X-FRM-Authorization': frmConfig.authToken } : {})
+        ...(frmConfig.authToken ? { 
+          'X-FRM-Authorization': frmConfig.authToken,
+          'X-API-Key': frmConfig.authToken 
+        } : {})
       },
       timeout: 6000
     };
@@ -2130,6 +2136,9 @@ wss.on('connection', ws => {
   ws.send(JSON.stringify({ type: 'init_state', data: serverState }));
   // Send console history
   ws.send(JSON.stringify({ type: 'console_history', data: consoleLogHistory }));
+  // Send initial automation rules and logs
+  ws.send(JSON.stringify({ type: 'automation_state', data: { rules: automationRules, logs: automationLogs } }));
+
 
   ws.on('message', message => {
     try {
@@ -2251,7 +2260,265 @@ setInterval(() => {
   });
 }, 2000);
 
+// ─────────────────────────────────────────────────────────────────────────────
+// AUTOMATION & EVENT-RESPONSE ENGINE
+// ─────────────────────────────────────────────────────────────────────────────
+let prevPowerOutages = {};
+let prevBatteryLow = {};
+let prevDerailedTrains = {};
+let prevTrainErrors = {};
+let prevOnlinePlayers = [];
+let prevDoggoInventories = {};
+let automationLogs = [];
+let automationRules = [];
+
+function loadAutomationRules() {
+  try {
+    const filePath = path.join(__dirname, 'automation_rules.json');
+    if (fs.existsSync(filePath)) {
+      automationRules = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    } else {
+      automationRules = [
+        {
+          id: 'rule_outage',
+          name: 'Power Grid Failure Alert',
+          enabled: true,
+          trigger: 'power_outage',
+          action: 'send_chat',
+          parameter: 'ALERT: Power grid collapse detected on Circuit {circuitGroupID}! Automated safety systems are active.'
+        },
+        {
+          id: 'rule_train',
+          name: 'Train Derailment Alert',
+          enabled: true,
+          trigger: 'train_derail',
+          action: 'send_chat',
+          parameter: 'ALERT: Train {trainName} has derailed en route to {trainStation}!'
+        },
+        {
+          id: 'rule_doggo',
+          name: 'Lizard Doggo Loot Alert',
+          enabled: true,
+          trigger: 'doggo_item',
+          action: 'send_chat',
+          parameter: 'Good doggo! A Lizard Doggo has found {itemNum}x {itemName}!'
+        }
+      ];
+      fs.writeFileSync(filePath, JSON.stringify(automationRules, null, 2));
+    }
+  } catch (err) {
+    console.error('[Automation Rules Load Error]', err);
+  }
+}
+loadAutomationRules();
+
+function triggerAutomationEvent(trigger, data) {
+  const timestamp = new Date().toISOString();
+  const eventId = 'evt_' + Math.random().toString(36).substring(2, 11);
+  let eventDesc = '';
+
+  if (trigger === 'power_outage') {
+    eventDesc = `Power Outage on Circuit ${data.circuitGroupID} (Capacity: ${data.capacity}MW)`;
+  } else if (trigger === 'battery_low') {
+    eventDesc = `Backup Batteries Low on Circuit ${data.circuitGroupID} (${data.batteryPercent}%, Time Left: ${data.timeEmpty})`;
+  } else if (trigger === 'train_derail') {
+    eventDesc = `Train '${data.trainName}' derailed heading to '${data.trainStation}'`;
+  } else if (trigger === 'train_error') {
+    eventDesc = `Train '${data.trainName}' error: ${data.errorMsg}`;
+  } else if (trigger === 'player_join') {
+    eventDesc = `Player '${data.playerName}' joined the server`;
+  } else if (trigger === 'player_leave') {
+    eventDesc = `Player '${data.playerName}' disconnected`;
+  } else if (trigger === 'doggo_item') {
+    eventDesc = `${data.doggoName} found item: ${data.itemNum}x ${data.itemName}`;
+  }
+
+  const newLog = {
+    id: eventId,
+    timestamp,
+    event: trigger,
+    description: eventDesc,
+    actionTaken: 'No matching rules triggered.',
+    severity: ['power_outage', 'battery_low', 'train_derail'].includes(trigger) ? 'HIGH' : 'INFO'
+  };
+
+  const matchingRules = automationRules.filter(r => r.enabled && r.trigger === trigger);
+  const actions = [];
+
+  matchingRules.forEach(rule => {
+    let formattedText = rule.parameter || '';
+    Object.keys(data).forEach(key => {
+      formattedText = formattedText.replace(new RegExp(`{${key}}`, 'g'), data[key]);
+    });
+
+    if (rule.action === 'send_chat') {
+      actions.push(`Send Chat: "${formattedText}"`);
+      frmPost('/sendChatMessage', {
+        message: formattedText.substring(0, 512),
+        sender: 'FICSIT A.I.',
+        color: { r: 1.0, g: 0.5, b: 0.0, a: 1.0 }
+      }).catch(err => console.error('[Send Chat failed]', err.message));
+    } else if (rule.action === 'toggle_switch') {
+      const switchId = rule.parameter;
+      actions.push(`Disable Switch: "${switchId}"`);
+      frmPost('/setSwitches', {
+        ID: switchId,
+        status: false
+      }).catch(err => console.error('[Set Switch failed]', err.message));
+    }
+  });
+
+  if (actions.length > 0) {
+    newLog.actionTaken = actions.join(' | ');
+  }
+
+  automationLogs.unshift(newLog);
+  if (automationLogs.length > 100) automationLogs.pop();
+
+  broadcastToWs('automation_event', { log: newLog, logs: automationLogs });
+}
+
+async function pollAndProcessAutomation() {
+  if (serverState.status !== 'RUNNING' || !frmConfig.authToken) return;
+
+  try {
+    // 1. Fetch Power Info
+    const powerRes = await frmGet('/getPower');
+    if (powerRes.status === 200 && Array.isArray(powerRes.body)) {
+      powerRes.body.forEach(circuit => {
+        const id = circuit.CircuitGroupID !== undefined ? circuit.CircuitGroupID : 0;
+        const fuseTriggered = !!circuit.FuseTriggered;
+        if (prevPowerOutages[id] !== undefined && !prevPowerOutages[id] && fuseTriggered) {
+          triggerAutomationEvent('power_outage', {
+            circuitGroupID: id,
+            capacity: circuit.PowerCapacity || 0,
+            consumed: circuit.PowerConsumed || 0
+          });
+        }
+        prevPowerOutages[id] = fuseTriggered;
+
+        const battPct = circuit.BatteryPercent || 0;
+        const diff = circuit.BatteryDifferential || 0;
+        const isLow = (battPct < 30 && diff < 0);
+        if (prevBatteryLow[id] !== undefined && !prevBatteryLow[id] && isLow) {
+          triggerAutomationEvent('battery_low', {
+            circuitGroupID: id,
+            batteryPercent: battPct,
+            timeEmpty: circuit.BatteryTimeEmpty || '00:00:00'
+          });
+        }
+        prevBatteryLow[id] = isLow;
+      });
+    }
+
+    // 2. Fetch Trains
+    const trainRes = await frmGet('/getTrains');
+    if (trainRes.status === 200 && Array.isArray(trainRes.body)) {
+      trainRes.body.forEach(train => {
+        const name = train.Name || train.TrainName;
+        if (!name) return;
+
+        const derailed = !!train.Derail || !!train.IsDerailed;
+        if (prevDerailedTrains[name] !== undefined && !prevDerailedTrains[name] && derailed) {
+          triggerAutomationEvent('train_derail', {
+            trainName: name,
+            trainStation: train.TrainStation || 'Unknown Station'
+          });
+        }
+        prevDerailedTrains[name] = derailed;
+
+        const hasError = !!train.ErrorStatus || (train.SelfDrivingStatus === 'Error');
+        if (prevTrainErrors[name] !== undefined && !prevTrainErrors[name] && hasError) {
+          triggerAutomationEvent('train_error', {
+            trainName: name,
+            errorMsg: train.ErrorStatus || 'Self driving error'
+          });
+        }
+        prevTrainErrors[name] = hasError;
+      });
+    }
+
+    // 3. Fetch Players
+    const playerRes = await frmGet('/getPlayer');
+    if (playerRes.status === 200 && Array.isArray(playerRes.body)) {
+      const currentPlayers = playerRes.body.map(p => p.PlayerName || p.Name).filter(Boolean);
+      currentPlayers.forEach(name => {
+        if (!prevOnlinePlayers.includes(name)) {
+          triggerAutomationEvent('player_join', { playerName: name });
+        }
+      });
+      prevOnlinePlayers.forEach(name => {
+        if (!currentPlayers.includes(name)) {
+          triggerAutomationEvent('player_leave', { playerName: name });
+        }
+      });
+      prevOnlinePlayers = currentPlayers;
+    }
+
+    // 4. Fetch Doggos
+    const doggoRes = await frmGet('/getDoggo');
+    if (doggoRes.status === 200 && Array.isArray(doggoRes.body)) {
+      doggoRes.body.forEach(doggo => {
+        const name = doggo.Name || `Lizard Doggo #${doggo.ID || 'Unknown'}`;
+        const inv = doggo.Inventory || [];
+        const currentCount = Array.isArray(inv) ? inv.reduce((sum, item) => sum + (item.NumItems || 1), 0) : 0;
+        const prevCount = prevDoggoInventories[name] || 0;
+        if (currentCount > prevCount) {
+          const lastItem = inv[inv.length - 1] || {};
+          triggerAutomationEvent('doggo_item', {
+            doggoName: name,
+            itemName: lastItem.ItemName || 'Unknown Item',
+            itemNum: lastItem.NumItems || 1
+          });
+        }
+        prevDoggoInventories[name] = currentCount;
+      });
+    }
+
+  } catch (err) {
+    if (process.env.DEBUG_FRM) console.error('[Automation Loop Error]', err.message);
+  }
+}
+
+// Start independent automation polling timer
+let automationPollTimer = setInterval(pollAndProcessAutomation, 5000);
+
+// Automation REST Routes
+app.get('/api/v1/automation/rules', (req, res) => {
+  res.json({ success: true, rules: automationRules });
+});
+
+app.post('/api/v1/automation/rules', (req, res) => {
+  const { rules } = req.body;
+  if (!Array.isArray(rules)) return res.status(400).json({ success: false, error: 'Invalid rules array' });
+  automationRules = rules;
+  try {
+    fs.writeFileSync(path.join(__dirname, 'automation_rules.json'), JSON.stringify(automationRules, null, 2));
+    broadcastToWs('automation_state', { rules: automationRules, logs: automationLogs });
+    res.json({ success: true, rules: automationRules });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/api/v1/automation/logs', (req, res) => {
+  res.json({ success: true, logs: automationLogs });
+});
+
+app.post('/api/v1/automation/trigger-test', (req, res) => {
+  const { trigger, data } = req.body;
+  triggerAutomationEvent(trigger, data || {});
+  res.json({ success: true, message: `Test event '${trigger}' triggered.` });
+});
+
+app.post('/api/v1/automation/clear-logs', (req, res) => {
+  automationLogs = [];
+  broadcastToWs('automation_state', { rules: automationRules, logs: automationLogs });
+  res.json({ success: true, message: 'Logs cleared.' });
+});
+
 loadInstalledMods();
+
 
 const PORT = process.env.PORT || 3030;
 server.listen(PORT, () => {

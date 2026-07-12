@@ -184,8 +184,11 @@
 }
 .sub-tab-content.active {
     display: flex !important;
+    max-height: calc(100vh - 140px);
+    overflow-y: auto;
     animation: subTabFadeIn 0.2s ease-in-out forwards;
 }
+
 
 @keyframes subTabFadeIn {
     from {
@@ -197,4 +200,11 @@
         transform: translateY(0);
     }
 }
+
+/* Fix contextual tab bar sticking behind fixed header */
+.tab-content > div.sticky.top-0 {
+    position: relative !important;
+    top: auto !important;
+}
+
 

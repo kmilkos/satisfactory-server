@@ -3,6 +3,9 @@ let socket;
 let serverState = null;
 let currentTab = 'dashboard';
 let selectedModId = null;
+let automationRules = [];
+let automationLogs = [];
+
 
 // SMR Live Data State
 let smrMods = [];           // Live mods from ficsit.app
@@ -163,6 +166,21 @@ function handleWsMessage(type, data) {
     case 'game_chat_error':
       // data = string error message
       appendGameChatError(data);
+      break;
+
+    case 'automation_state':
+      automationRules = data.rules || [];
+      automationLogs = data.logs || [];
+      renderAutomationRules();
+      renderAutomationLogs();
+      break;
+
+    case 'automation_event':
+      if (data.log) {
+        automationLogs.unshift(data.log);
+        if (automationLogs.length > 100) automationLogs.pop();
+        renderAutomationLogs();
+      }
       break;
     // ─────────────────────────────────────────────────────────────────────────
   }
@@ -443,20 +461,20 @@ function drawCalibrationLatencyChart() {
 function switchTab(tabId) {
   currentTab = tabId;
   
-  // Update sidebar links UI active markers
-  document.querySelectorAll('.sidebar-nav-link').forEach(link => {
+  // Update header links UI active markers
+  document.querySelectorAll('.nav-link-btn').forEach(link => {
     const isTarget = link.getAttribute('data-tab') === tabId;
     if (isTarget) {
-      link.className = 'sidebar-nav-link flex items-center gap-4 bg-secondary-container text-primary border-l-4 border-primary px-6 py-2 active:translate-x-1 transition-all font-label-caps text-label-caps';
-      // Set icon fill variation to filled if supported
+      link.className = 'nav-link-btn text-orange-500 font-bold hover:text-orange-500 transition-colors cursor-pointer flex items-center gap-2 font-sans text-sm';
       const icon = link.querySelector('.material-symbols-outlined');
       if (icon) icon.style.fontVariationSettings = "'FILL' 1";
     } else {
-      link.className = 'sidebar-nav-link flex items-center gap-4 text-on-surface-variant px-6 py-2 hover:bg-surface-variant transition-all font-label-caps text-label-caps';
+      link.className = 'nav-link-btn text-slate-300 hover:text-orange-500 transition-colors cursor-pointer flex items-center gap-2 font-sans text-sm';
       const icon = link.querySelector('.material-symbols-outlined');
       if (icon) icon.style.fontVariationSettings = "'FILL' 0";
     }
   });
+
 
   // Switch workspace content panels visibility
   document.querySelectorAll('.tab-content').forEach(panel => {
@@ -2830,5 +2848,228 @@ async function sendPersonaChatMessage() {
     appendGameChatError(`Network error: ${err.message}`);
   }
 }
+
 // ─────────────────────────────────────────────────────────────────────────────
+// AUTOMATION & SMART GRID FRONTEND CONTROLLER
+// ─────────────────────────────────────────────────────────────────────────────
+
+function onRuleActionChange() {
+  const action = document.getElementById('rule-action').value;
+  const label = document.getElementById('rule-param-label');
+  const paramInput = document.getElementById('rule-param');
+  
+  if (action === 'send_chat') {
+    label.innerText = 'CHAT MESSAGE MESSAGE (supports {circuitGroupID}, {batteryPercent}, {trainName}, {itemName})';
+    paramInput.placeholder = 'ALERT: Grid failure on circuit {circuitGroupID}!';
+  } else if (action === 'toggle_switch') {
+    label.innerText = 'POWER SWITCH ID/NAME (Priority power switch to disable)';
+    paramInput.placeholder = 'e.g. Switch A or priority_switch_1';
+  }
+}
+
+function renderAutomationRules() {
+  const container = document.getElementById('rules-manifest-container');
+  if (!container) return;
+  
+  if (automationRules.length === 0) {
+    container.innerHTML = `
+      <div class="text-center p-6 border border-dashed border-outline-variant/60 rounded text-on-surface-variant font-code-sm text-xs">
+          NO AUTOMATION RULES INSTALLED. CREATE ONE ON THE LEFT.
+      </div>
+    `;
+    return;
+  }
+  
+  container.innerHTML = automationRules.map(rule => {
+    const triggerNames = {
+      power_outage: 'Power Outage (Fuse Tripped)',
+      battery_low: 'Backup Battery Low (<30%)',
+      train_derail: 'Train Derailed',
+      train_error: 'Train stuck/error',
+      player_join: 'Player Joined Server',
+      player_leave: 'Player Left Server',
+      doggo_item: 'Doggo found item'
+    };
+    
+    const actionNames = {
+      send_chat: 'Send In-Game Chat',
+      toggle_switch: 'Disable Power Switch'
+    };
+    
+    return `
+      <div class="bg-surface-container-high border ${rule.enabled ? 'border-primary/40' : 'border-outline-variant'} p-4 rounded flex items-center justify-between transition-all duration-300">
+          <div>
+              <div class="flex items-center gap-3">
+                  <span class="text-xs font-bold ${rule.enabled ? 'text-primary' : 'text-on-surface-variant'} uppercase">${rule.name || 'Unnamed Rule'}</span>
+                  <span class="px-2 py-0.5 text-[9px] font-bold font-label-caps bg-surface-container border border-outline-variant text-outline rounded">${rule.id}</span>
+              </div>
+              <div class="grid grid-cols-2 gap-x-6 gap-y-1 text-[10px] font-code-sm text-on-surface-variant mt-2">
+                  <div><strong class="text-outline">TRIGGER:</strong> ${triggerNames[rule.trigger] || rule.trigger}</div>
+                  <div><strong class="text-outline">ACTION:</strong> ${actionNames[rule.action] || rule.action}</div>
+                  <div class="col-span-2"><strong class="text-outline">PARAMETER:</strong> <code class="text-on-surface bg-surface-container px-1 py-0.5">${rule.parameter}</code></div>
+              </div>
+          </div>
+          <div class="flex items-center gap-3">
+              <button onclick="toggleRuleState('${rule.id}')" 
+                  class="px-3 py-1.5 border text-[10px] font-bold font-label-caps transition-colors ${rule.enabled ? 'border-primary/55 bg-primary/10 text-primary hover:bg-primary/20' : 'border-outline-variant text-on-surface-variant hover:bg-surface-variant'}">
+                  ${rule.enabled ? 'ENABLED' : 'DISABLED'}
+              </button>
+              <button onclick="deleteRule('${rule.id}')" 
+                  class="material-symbols-outlined text-sm text-on-surface-variant hover:text-error transition-colors p-1.5 border border-outline-variant hover:border-error/40">
+                  delete
+              </button>
+          </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderAutomationLogs() {
+  const container = document.getElementById('automation-logs-container');
+  if (!container) return;
+  
+  if (automationLogs.length === 0) {
+    container.innerHTML = `
+      <div class="text-center p-8 text-on-surface-variant font-code-sm">
+          NO AUTOMATION LOG EVENTS RECORDED.
+      </div>
+    `;
+    return;
+  }
+  
+  container.innerHTML = automationLogs.map((log, idx) => {
+    const timeStr = new Date(log.timestamp).toLocaleTimeString();
+    const isHigh = log.severity === 'HIGH';
+    
+    return `
+      <div class="grid grid-cols-12 gap-2 py-1.5 border-b border-outline-variant/30 hover:bg-surface-variant/20 px-2 transition-colors ${isHigh ? 'text-error bg-error/5 border-l-2 border-l-error' : 'text-on-surface'}">
+          <div class="col-span-2 font-code-sm text-outline">${timeStr}</div>
+          <div class="col-span-2 font-bold uppercase tracking-wider text-[10px]">${log.event}</div>
+          <div class="col-span-5">${log.description}</div>
+          <div class="col-span-2 font-code-sm text-outline">${log.actionTaken}</div>
+          <div class="col-span-1 text-right">
+              <span class="px-1.5 py-0.5 rounded text-[8px] font-bold font-label-caps ${isHigh ? 'bg-error-container text-error border border-error/20' : 'bg-surface-container border border-outline-variant text-outline'}">
+                  ${log.severity}
+              </span>
+          </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function addAutomationRule() {
+  const nameInput = document.getElementById('rule-name');
+  const triggerSelect = document.getElementById('rule-trigger');
+  const actionSelect = document.getElementById('rule-action');
+  const paramInput = document.getElementById('rule-param');
+  
+  const name = nameInput.value.trim();
+  const trigger = triggerSelect.value;
+  const action = actionSelect.value;
+  const parameter = paramInput.value.trim();
+  
+  if (!name || !parameter) {
+    showSyncNotice('rule-config-notice', 'Name and parameters are required.', true);
+    return;
+  }
+  
+  const newRule = {
+    id: 'rule_' + Math.random().toString(36).substring(2, 9),
+    name,
+    enabled: true,
+    trigger,
+    action,
+    parameter
+  };
+  
+  automationRules.push(newRule);
+  await saveAutomationRules();
+  
+  // Clear inputs
+  nameInput.value = '';
+  paramInput.value = '';
+}
+
+async function toggleRuleState(ruleId) {
+  const rule = automationRules.find(r => r.id === ruleId);
+  if (rule) {
+    rule.enabled = !rule.enabled;
+    await saveAutomationRules();
+  }
+}
+
+async function deleteRule(ruleId) {
+  automationRules = automationRules.filter(r => r.id !== ruleId);
+  await saveAutomationRules();
+}
+
+async function saveAutomationRules() {
+  try {
+    const res = await fetch('/api/v1/automation/rules', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rules: automationRules })
+    });
+    const data = await res.json();
+    if (data.success) {
+      automationRules = data.rules;
+      renderAutomationRules();
+    }
+  } catch (err) {
+    console.error('Failed to save rules:', err);
+  }
+}
+
+async function triggerTestEvent() {
+  const trigger = prompt("Enter test event trigger (power_outage, battery_low, train_derail, doggo_item, player_join):", "power_outage");
+  if (!trigger) return;
+  
+  let data = {};
+  if (trigger === 'power_outage') {
+    data = { circuitGroupID: 0, capacity: 2500, consumed: 2800 };
+  } else if (trigger === 'battery_low') {
+    data = { circuitGroupID: 0, batteryPercent: 24, timeEmpty: '00:04:12' };
+  } else if (trigger === 'train_derail') {
+    data = { trainName: 'Iron Ore Express', trainStation: 'Refinery Alpha' };
+  } else if (trigger === 'doggo_item') {
+    data = { doggoName: 'Pioneer Doggo', itemName: 'Nuclear Waste', itemNum: 1 };
+  } else {
+    data = { playerName: 'BlaCKieMorgan' };
+  }
+  
+  try {
+    await fetch('/api/v1/automation/trigger-test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ trigger, data })
+    });
+  } catch (err) {
+    console.error('Failed to trigger test event:', err);
+  }
+}
+
+async function clearAutomationLogs() {
+  if (!confirm("Are you sure you want to clear all logged events?")) return;
+  try {
+    const res = await fetch('/api/v1/automation/clear-logs', { method: 'POST' });
+    const data = await res.json();
+    if (data.success) {
+      automationLogs = [];
+      renderAutomationLogs();
+    }
+  } catch (err) {
+    console.error('Failed to clear logs:', err);
+  }
+}
+
+// helper to show rule config notices
+function showSyncNotice(elementId, msg, isError) {
+  const el = document.getElementById(elementId);
+  if (!el) return;
+  el.innerText = msg;
+  el.className = isError ? 'text-error mt-2 font-code-sm' : 'text-primary mt-2 font-code-sm';
+  setTimeout(() => el.innerText = '', 5000);
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 
