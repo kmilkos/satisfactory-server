@@ -3071,5 +3071,37 @@ function showSyncNotice(elementId, msg, isError) {
   setTimeout(() => el.innerText = '', 5000);
 }
 // ─────────────────────────────────────────────────────────────────────────────
+function switchTabAndSubTab(mainTabId, subTabId) {
+  // 1. Switch the main tab
+  switchTab(mainTabId);
+
+  // 2. Find the corresponding sub-tab panel inside the tab panel
+  const mainTabPanel = document.getElementById(`${mainTabId}-tab-panel`);
+  if (mainTabPanel) {
+    mainTabPanel.querySelectorAll('.sub-tab-content').forEach(panel => {
+      if (panel.id === `${mainTabId}-${subTabId}-subpanel`) {
+        panel.classList.add('active');
+        panel.classList.remove('hidden');
+      } else {
+        panel.classList.remove('active');
+        panel.classList.add('hidden');
+      }
+    });
+
+    // Update subtab menu bar active styling dynamically
+    const subMenuBar = mainTabPanel.querySelector('.sticky.top-0, div.sticky, .border-b');
+    if (subMenuBar) {
+      subMenuBar.querySelectorAll('button').forEach(btn => {
+        const onclickAttr = btn.getAttribute('onclick') || '';
+        if (onclickAttr.includes(`'${subTabId}'`)) {
+          btn.className = 'px-6 py-3 font-label-caps text-label-caps border-b-2 border-primary text-primary bg-primary/5';
+        } else {
+          btn.className = 'px-6 py-3 font-label-caps text-label-caps text-on-surface-variant hover:text-on-surface hover:bg-surface-variant/30 transition-all';
+        }
+      });
+    }
+  }
+}
+
 
 

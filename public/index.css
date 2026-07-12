@@ -201,10 +201,10 @@
     }
 }
 
-/* Fix contextual tab bar sticking behind fixed header */
+/* Hide secondary contextual tab bars since sub-tabs are accessed via Command Bridge dropdowns */
 .tab-content > div.sticky.top-0 {
-    position: relative !important;
-    top: auto !important;
+    display: none !important;
 }
+
 
 

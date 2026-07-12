@@ -103,18 +103,58 @@
       
       <!-- Left Side: Server Operations -->
       <nav class="flex flex-1 space-x-6 text-sm font-sans font-medium text-slate-300">
-        <a onclick="switchTab('steamcmd')" data-tab="steamcmd" class="nav-link-btn hover:text-orange-500 transition-colors cursor-pointer flex items-center gap-2 font-sans text-sm">
+        
+        <!-- DEPLOY -->
+        <div class="relative group">
+          <button class="nav-link-btn flex items-center gap-1.5 hover:text-orange-500 transition-colors py-2 cursor-pointer font-sans text-sm focus:outline-none" data-tab="steamcmd">
             <span class="material-symbols-outlined text-sm">settings_suggest</span> DEPLOY
-        </a>
-        <a onclick="switchTab('dashboard')" data-tab="dashboard" class="nav-link-btn text-orange-500 font-bold hover:text-orange-500 transition-colors cursor-pointer flex items-center gap-2 font-sans text-sm">
+            <span class="material-symbols-outlined text-xs">arrow_drop_down</span>
+          </button>
+          <div class="absolute left-0 mt-1 w-44 bg-zinc-950 border border-slate-700 shadow-xl rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 py-1">
+            <a onclick="switchTabAndSubTab('steamcmd', 'pipelines')" class="block px-4 py-2 text-xs font-code-sm text-slate-300 hover:bg-slate-800 hover:text-orange-500 cursor-pointer">Pipelines</a>
+            <a onclick="switchTabAndSubTab('steamcmd', 'hardware')" class="block px-4 py-2 text-xs font-code-sm text-slate-300 hover:bg-slate-800 hover:text-orange-500 cursor-pointer">Hardware</a>
+            <a onclick="switchTabAndSubTab('steamcmd', 'maintenance')" class="block px-4 py-2 text-xs font-code-sm text-slate-300 hover:bg-slate-800 hover:text-orange-500 cursor-pointer">Diagnostics</a>
+          </div>
+        </div>
+
+        <!-- TELEMETRY -->
+        <div class="relative group">
+          <button class="nav-link-btn flex items-center gap-1.5 hover:text-orange-500 transition-colors py-2 cursor-pointer font-sans text-sm focus:outline-none" data-tab="dashboard">
             <span class="material-symbols-outlined text-sm">analytics</span> TELEMETRY
-        </a>
-        <a onclick="switchTab('mods')" data-tab="mods" class="nav-link-btn hover:text-orange-500 transition-colors cursor-pointer flex items-center gap-2 font-sans text-sm">
+            <span class="material-symbols-outlined text-xs">arrow_drop_down</span>
+          </button>
+          <div class="absolute left-0 mt-1 w-44 bg-zinc-950 border border-slate-700 shadow-xl rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 py-1">
+            <a onclick="switchTabAndSubTab('dashboard', 'monitor')" class="block px-4 py-2 text-xs font-code-sm text-slate-300 hover:bg-slate-800 hover:text-orange-500 cursor-pointer">Monitor</a>
+            <a onclick="switchTabAndSubTab('dashboard', 'analytics')" class="block px-4 py-2 text-xs font-code-sm text-slate-300 hover:bg-slate-800 hover:text-orange-500 cursor-pointer">Analytics</a>
+            <a onclick="switchTabAndSubTab('dashboard', 'alerts')" class="block px-4 py-2 text-xs font-code-sm text-slate-300 hover:bg-slate-800 hover:text-orange-500 cursor-pointer">Alerts</a>
+          </div>
+        </div>
+
+        <!-- MODS -->
+        <div class="relative group">
+          <button class="nav-link-btn flex items-center gap-1.5 hover:text-orange-500 transition-colors py-2 cursor-pointer font-sans text-sm focus:outline-none" data-tab="mods">
             <span class="material-symbols-outlined text-sm">widgets</span> MODS
-        </a>
-        <a onclick="switchTab('automation')" data-tab="automation" class="nav-link-btn hover:text-orange-500 transition-colors cursor-pointer flex items-center gap-2 font-sans text-sm">
+            <span class="material-symbols-outlined text-xs">arrow_drop_down</span>
+          </button>
+          <div class="absolute left-0 mt-1 w-44 bg-zinc-950 border border-slate-700 shadow-xl rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 py-1">
+            <a onclick="switchTabAndSubTab('mods', 'registry')" class="block px-4 py-2 text-xs font-code-sm text-slate-300 hover:bg-slate-800 hover:text-orange-500 cursor-pointer">Installed</a>
+            <a onclick="switchTabAndSubTab('mods', 'browser')" class="block px-4 py-2 text-xs font-code-sm text-slate-300 hover:bg-slate-800 hover:text-orange-500 cursor-pointer">Browse</a>
+            <a onclick="switchTabAndSubTab('mods', 'configs')" class="block px-4 py-2 text-xs font-code-sm text-slate-300 hover:bg-slate-800 hover:text-orange-500 cursor-pointer">Configs</a>
+          </div>
+        </div>
+
+        <!-- AUTOMATION -->
+        <div class="relative group">
+          <button class="nav-link-btn flex items-center gap-1.5 hover:text-orange-500 transition-colors py-2 cursor-pointer font-sans text-sm focus:outline-none" data-tab="automation">
             <span class="material-symbols-outlined text-sm">schema</span> AUTOMATION
-        </a>
+            <span class="material-symbols-outlined text-xs">arrow_drop_down</span>
+          </button>
+          <div class="absolute left-0 mt-1 w-44 bg-zinc-950 border border-slate-700 shadow-xl rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 py-1">
+            <a onclick="switchTabAndSubTab('automation', 'rules')" class="block px-4 py-2 text-xs font-code-sm text-slate-300 hover:bg-slate-800 hover:text-orange-500 cursor-pointer">Rules</a>
+            <a onclick="switchTabAndSubTab('automation', 'logs')" class="block px-4 py-2 text-xs font-code-sm text-slate-300 hover:bg-slate-800 hover:text-orange-500 cursor-pointer">Event Logger</a>
+          </div>
+        </div>
+
       </nav>
 
       <!-- Center: Greg & Namespace -->
@@ -133,12 +173,33 @@
 
       <!-- Right Side: Diagnostics & Settings -->
       <nav class="flex flex-1 justify-end space-x-6 text-sm font-sans font-medium text-slate-300">
-        <a onclick="switchTab('terminal')" data-tab="terminal" class="nav-link-btn hover:text-orange-500 transition-colors cursor-pointer flex items-center gap-2 font-sans text-sm">
+        
+        <!-- COGNITIVE SHELL -->
+        <div class="relative group">
+          <button class="nav-link-btn flex items-center gap-1.5 hover:text-orange-500 transition-colors py-2 cursor-pointer font-sans text-sm focus:outline-none" data-tab="terminal">
             <span class="material-symbols-outlined text-sm">sensors</span> COGNITIVE SHELL
-        </a>
-        <a onclick="switchTab('api')" data-tab="api" class="nav-link-btn hover:text-orange-500 transition-colors cursor-pointer flex items-center gap-2 font-sans text-sm">
+            <span class="material-symbols-outlined text-xs">arrow_drop_down</span>
+          </button>
+          <div class="absolute right-0 mt-1 w-44 bg-zinc-950 border border-slate-700 shadow-xl rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 py-1">
+            <a onclick="switchTabAndSubTab('terminal', 'link')" class="block px-4 py-2 text-xs font-code-sm text-slate-300 hover:bg-slate-800 hover:text-orange-500 cursor-pointer">Cognitive Link</a>
+            <a onclick="switchTabAndSubTab('terminal', 'advisory')" class="block px-4 py-2 text-xs font-code-sm text-slate-300 hover:bg-slate-800 hover:text-orange-500 cursor-pointer">Neural Advisory</a>
+            <a onclick="switchTabAndSubTab('terminal', 'settings')" class="block px-4 py-2 text-xs font-code-sm text-slate-300 hover:bg-slate-800 hover:text-orange-500 cursor-pointer">Settings</a>
+          </div>
+        </div>
+
+        <!-- API CONSOLE -->
+        <div class="relative group">
+          <button class="nav-link-btn flex items-center gap-1.5 hover:text-orange-500 transition-colors py-2 cursor-pointer font-sans text-sm focus:outline-none" data-tab="api">
             <span class="material-symbols-outlined text-sm">settings_input_component</span> API CONSOLE
-        </a>
+            <span class="material-symbols-outlined text-xs">arrow_drop_down</span>
+          </button>
+          <div class="absolute right-0 mt-1 w-44 bg-zinc-950 border border-slate-700 shadow-xl rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 py-1">
+            <a onclick="switchTabAndSubTab('api', 'sandbox')" class="block px-4 py-2 text-xs font-code-sm text-slate-300 hover:bg-slate-800 hover:text-orange-500 cursor-pointer">Sandbox</a>
+            <a onclick="switchTabAndSubTab('api', 'metrics')" class="block px-4 py-2 text-xs font-code-sm text-slate-300 hover:bg-slate-800 hover:text-orange-500 cursor-pointer">Metrics</a>
+            <a onclick="switchTabAndSubTab('api', 'settings')" class="block px-4 py-2 text-xs font-code-sm text-slate-300 hover:bg-slate-800 hover:text-orange-500 cursor-pointer">Settings</a>
+          </div>
+        </div>
+
         <button onclick="showSyncToast()" class="px-3 py-1 bg-error-container/20 text-error hover:bg-error hover:text-on-error border border-error/40 text-[10px] font-bold font-label-caps transition-all flex items-center gap-1 active:scale-95 duration-150 rounded">
             EMERGENCY STOP
         </button>
