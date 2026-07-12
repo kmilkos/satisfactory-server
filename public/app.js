@@ -2623,6 +2623,9 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // Load FRM chat config from localStorage on boot
   loadFrmChatConfig();
+
+  // Initialize rules action guide view
+  onRuleActionChange();
 });
 
 
@@ -2857,13 +2860,56 @@ function onRuleActionChange() {
   const action = document.getElementById('rule-action').value;
   const label = document.getElementById('rule-param-label');
   const paramInput = document.getElementById('rule-param');
+  const guideContainer = document.getElementById('rule-action-guide-container');
   
   if (action === 'send_chat') {
-    label.innerText = 'CHAT MESSAGE MESSAGE (supports {circuitGroupID}, {batteryPercent}, {trainName}, {itemName})';
+    label.innerText = 'CHAT MESSAGE TEMPLATE (supports variables)';
     paramInput.placeholder = 'ALERT: Grid failure on circuit {circuitGroupID}!';
+    if (guideContainer) {
+      guideContainer.innerHTML = `
+        <div class="flex items-center gap-1.5 text-primary mb-1">
+          <span class="material-symbols-outlined text-[12px]">info</span>
+          <span class="font-bold uppercase tracking-wider text-[9px]">Action Guide: In-Game Chat Broadcast</span>
+        </div>
+        <p class="mb-2 text-on-surface-variant font-code-sm">Broadcasts a message to the in-game chat when the event triggers. The message is signed by the active AI persona (ADA, Shroud, or Unit-7) with their corresponding color branding.</p>
+        <div class="grid grid-cols-12 gap-1 text-[9px] border-t border-outline-variant/20 pt-1.5 mt-1.5">
+          <div class="col-span-4 font-bold text-on-surface">VARIABLE</div>
+          <div class="col-span-8 font-bold text-on-surface">REPLACED BY</div>
+          
+          <div class="col-span-4 text-primary font-mono">{circuitGroupID}</div>
+          <div class="col-span-8">Failed priority power grid ID.</div>
+          
+          <div class="col-span-4 text-primary font-mono">{batteryPercent}</div>
+          <div class="col-span-8">Remaining backup battery bank %.</div>
+          
+          <div class="col-span-4 text-primary font-mono">{trainName}</div>
+          <div class="col-span-8">The name of the derailed or stuck train.</div>
+          
+          <div class="col-span-4 text-primary font-mono">{itemName}</div>
+          <div class="col-span-8">Item retrieved by Lizard Doggo.</div>
+        </div>
+      `;
+    }
   } else if (action === 'toggle_switch') {
-    label.innerText = 'POWER SWITCH ID/NAME (Priority power switch to disable)';
-    paramInput.placeholder = 'e.g. Switch A or priority_switch_1';
+    label.innerText = 'POWER SWITCH IDENTIFIER (Priority Switch Name/ID)';
+    paramInput.placeholder = 'e.g. priority_switch_3 or Sector B Switch';
+    if (guideContainer) {
+      guideContainer.innerHTML = `
+        <div class="flex items-center gap-1.5 text-primary mb-1">
+          <span class="material-symbols-outlined text-[12px]">info</span>
+          <span class="font-bold uppercase tracking-wider text-[9px]">Action Guide: Load Shedding Safeguard</span>
+        </div>
+        <p class="mb-2 text-on-surface-variant font-code-sm">Opens (disables) a Priority Power Switch or standard Power Switch on Massage-2(AB)b to automatically disconnect high-load factory sectors when power fails or batteries run low.</p>
+        <div class="border-t border-outline-variant/20 pt-1.5 mt-1.5 text-[9px]">
+          <strong class="text-on-surface font-sans">Identifier Formats:</strong>
+          <ul class="list-disc list-inside space-y-0.5 text-on-surface-variant mt-1">
+            <li>Match exact in-game switch name (e.g. <code class="text-primary font-mono">Steel Plant Switch</code>)</li>
+            <li>FRM power switch index number (e.g. <code class="text-primary font-mono">3</code>)</li>
+          </ul>
+          <div class="mt-2 text-error font-semibold italic">⚠️ Warning: Ensure the switch is configured in-game before adding the rule.</div>
+        </div>
+      `;
+    }
   }
 }
 
