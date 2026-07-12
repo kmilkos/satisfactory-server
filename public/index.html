@@ -1268,31 +1268,34 @@
                 <div class="grid grid-cols-12 gap-gutter mt-2">
                     <div class="col-span-12 lg:col-span-4 bg-surface-container-high border border-outline-variant p-5 relative overflow-hidden">
                         <div class="absolute top-0 right-0 hazard-pattern w-16 h-full opacity-20"></div>
-                        <div class="font-label-caps text-label-caps text-on-surface-variant mb-1 text-[10px] font-bold">CURRENT LINK STATUS</div>
-                        <div class="font-headline-sm text-headline-sm text-tertiary flex items-center gap-2 font-bold">
-                            <span class="w-2 h-2 bg-tertiary rounded-full animate-pulse"></span>
-                            SYNCHRONIZED
+                        <div class="font-label-caps text-label-caps text-on-surface-variant mb-1 text-[10px] font-bold">ACTIVE COORDINATOR</div>
+                        <div id="advisory-persona-badge" class="font-headline-sm text-headline-sm text-primary flex items-center gap-2 font-bold">
+                            A.D.A.
                         </div>
                         <div class="mt-4 grid grid-cols-2 gap-4">
                             <div>
-                                <div class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Uptime</div>
-                                <div class="font-code-sm text-code-sm text-on-surface">342:12:04:19</div>
+                                <div class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Link Mode</div>
+                                <div class="font-code-sm text-code-sm text-tertiary">SYNCHRONIZED</div>
                             </div>
                             <div>
                                 <div class="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Efficiency</div>
-                                <div class="font-code-sm text-code-sm text-on-surface">98.4%</div>
+                                <div class="font-code-sm text-code-sm text-on-surface">99.2%</div>
                             </div>
                         </div>
+                        <button id="advisory-refresh-btn" onclick="fetchNeuralAdvisory()"
+                            class="mt-6 w-full py-2 bg-zinc-950 border border-outline-variant hover:bg-zinc-900 text-on-surface text-[10px] font-bold font-label-caps tracking-wider transition-all flex items-center justify-center gap-1.5">
+                            <span class="material-symbols-outlined text-sm">refresh</span> REFRESH ADVISORY
+                        </button>
                     </div>
                     
                     <div class="col-span-12 lg:col-span-8 bg-surface-container-high border border-outline-variant p-5">
                         <div class="font-label-caps text-label-caps text-primary mb-4 flex items-center gap-2 font-bold">
-                            <span class="material-symbols-outlined text-[18px]">info</span>
-                            SYSTEM CORE ADVISORY
+                            <span class="material-symbols-outlined text-[18px]">psychology</span>
+                            OPERATIONAL & COGNITIVE ADVISORY
                         </div>
-                        <p class="font-body-md text-body-md text-on-surface-variant leading-relaxed text-xs">
-                            Adjustment of cognitive link parameters may result in temporary neural desync. Ensure all FICSIT personnel are equipped with standard issue dampeners before modifying Core Allocation limits. Unauthorized overclocking is strictly prohibited by central command.
-                        </p>
+                        <div id="neural-advisory-text" class="font-code-sm text-on-surface text-xs leading-relaxed whitespace-pre-line border-t border-outline-variant/30 pt-3">
+                            ⏳ Waiting for telemetry link sync...
+                        </div>
                     </div>
 
                     <!-- Decorative Factory Visual / ThreeJS Placeholder -->

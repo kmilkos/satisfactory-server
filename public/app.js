@@ -3077,6 +3077,45 @@ function renderAutomationLogs() {
   }).join('');
 }
 
+async function fetchNeuralAdvisory() {
+  const container = document.getElementById('neural-advisory-text');
+  if (!container) return;
+
+  const refreshBtn = document.getElementById('advisory-refresh-btn');
+  if (refreshBtn) {
+    refreshBtn.disabled = true;
+    refreshBtn.innerHTML = `<span class="material-symbols-outlined text-[12px] animate-spin">sync</span> RECALCULATING...`;
+  }
+
+  container.innerHTML = `⏳ GATHERING TELEMETRY STATE AND GENERATING DYNAMIC OPERATIONAL MATRIX...`;
+
+  try {
+    const res = await fetch('/api/v1/ai/advisory');
+    const data = await res.json();
+    if (data.success) {
+      const personaColors = { ada: 'text-primary', shroud: 'text-error', unit7: 'text-tertiary' };
+      const brandClass = personaColors[data.persona] || 'text-primary';
+      
+      const badge = document.getElementById('advisory-persona-badge');
+      if (badge) {
+        badge.innerText = data.sender.toUpperCase();
+        badge.className = `font-headline-sm text-headline-sm font-bold flex items-center gap-2 ${brandClass}`;
+      }
+
+      container.innerHTML = data.advisory;
+    } else {
+      container.innerHTML = `⚠️ Advisory Core Error: ${data.error || 'Failed to initialize link.'}`;
+    }
+  } catch (err) {
+    container.innerHTML = `⚠️ Neural Link Fault: ${err.message}`;
+  } finally {
+    if (refreshBtn) {
+      refreshBtn.disabled = false;
+      refreshBtn.innerHTML = `<span class="material-symbols-outlined text-sm">refresh</span> REFRESH ADVISORY`;
+    }
+  }
+}
+
 async function addAutomationRule() {
   console.log('[DEBUG] addAutomationRule called');
   try {
@@ -3248,6 +3287,9 @@ function switchTabAndSubTab(mainTabId, subTabId) {
         }
       });
     }
+  }
+  if (mainTabId === 'terminal' && subTabId === 'advisory') {
+    fetchNeuralAdvisory();
   }
 }
 

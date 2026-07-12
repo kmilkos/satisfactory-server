@@ -2269,6 +2269,10 @@ let prevDerailedTrains = {};
 let prevTrainErrors = {};
 let prevOnlinePlayers = [];
 let prevDoggoInventories = {};
+let latestPower = [];
+let latestTrains = [];
+let latestPlayers = [];
+let latestDoggos = [];
 let automationLogs = [];
 let automationRules = [];
 
@@ -2455,6 +2459,7 @@ async function pollAndProcessAutomation() {
     // 1. Fetch Power Info
     const powerRes = await frmGet('/getPower');
     if (powerRes.status === 200 && Array.isArray(powerRes.body)) {
+      latestPower = powerRes.body;
       powerRes.body.forEach(circuit => {
         const id = circuit.CircuitGroupID !== undefined ? circuit.CircuitGroupID : 0;
         const fuseTriggered = !!circuit.FuseTriggered;
@@ -2484,6 +2489,7 @@ async function pollAndProcessAutomation() {
     // 2. Fetch Trains
     const trainRes = await frmGet('/getTrains');
     if (trainRes.status === 200 && Array.isArray(trainRes.body)) {
+      latestTrains = trainRes.body;
       trainRes.body.forEach(train => {
         const name = train.Name || train.TrainName;
         if (!name) return;
@@ -2512,6 +2518,7 @@ async function pollAndProcessAutomation() {
     const playerRes = await frmGet('/getPlayer');
     if (playerRes.status === 200 && Array.isArray(playerRes.body)) {
       const currentPlayers = playerRes.body.map(p => p.PlayerName || p.Name).filter(Boolean);
+      latestPlayers = currentPlayers;
       currentPlayers.forEach(name => {
         if (!prevOnlinePlayers.includes(name)) {
           triggerAutomationEvent('player_join', { playerName: name });
@@ -2528,6 +2535,7 @@ async function pollAndProcessAutomation() {
     // 4. Fetch Doggos
     const doggoRes = await frmGet('/getDoggo');
     if (doggoRes.status === 200 && Array.isArray(doggoRes.body)) {
+      latestDoggos = doggoRes.body;
       doggoRes.body.forEach(doggo => {
         const name = doggo.Name || `Lizard Doggo #${doggo.ID || 'Unknown'}`;
         const inv = doggo.Inventory || [];
@@ -2573,6 +2581,75 @@ app.post('/api/v1/automation/rules', (req, res) => {
 
 app.get('/api/v1/automation/logs', (req, res) => {
   res.json({ success: true, logs: automationLogs });
+});
+
+app.get('/api/v1/ai/advisory', async (req, res) => {
+  // 1. Compile the current operational telemetry status
+  const powerStatus = latestPower.map(c => `Circuit ${c.CircuitGroupID !== undefined ? c.CircuitGroupID : 0}: Capacity ${c.PowerCapacity || 0}MW, Consumed ${c.PowerConsumed || 0}MW, Battery ${c.BatteryPercent || 0}% (Fuse Tripped: ${!!c.FuseTriggered})`).join('; ');
+  const trainStatus = latestTrains.map(t => `Train ${t.Name || t.TrainName || 'Loco'}: Status ${t.Derail || t.IsDerailed ? 'Derailed' : t.SelfDrivingStatus || 'Active'}`).join('; ');
+  const playerStatus = latestPlayers.join(', ') || 'None';
+  const doggoStatus = `${latestDoggos.length} doggo(s) active`;
+
+  const eventDesc = `Power: [${powerStatus || 'No grid data'}]. Trains: [${trainStatus || 'No trains active'}]. Players online: [${playerStatus}]. Doggos: [${doggoStatus}].`;
+
+  // 2. Decide the persona to generate the advisory
+  const personaKey = frmActivePersona || 'ada';
+  const personaNames = { ada: 'A.D.A.', shroud: 'THE SHROUD', unit7: 'UNIT-7' };
+  const senderName = personaNames[personaKey] || 'AI';
+  
+  // 3. Fallback heuristic response if LLM is not configured/offline
+  let advisoryText = '';
+  if (personaKey === 'ada') {
+    advisoryText = `• POWER ALLOCATION: Grid status normal. Ensure consumption metrics stay below 85% capacity.\n• AUTOPILOT SIGNALING: Autopilot systems active. Monitor signal blocks for collisions.\n• PERSONNEL SAFETY: Reminding all personnel that unauthorized breaks are logged in efficiency scorecards.`;
+  } else if (personaKey === 'shroud') {
+    advisoryText = `...the machines are singing... they glow in the dark... keep them warm... feed the generators... do not let them grow cold...`;
+  } else {
+    advisoryText = `- SYSTEM STATUS: ONLINE\n- POWER MARGIN: ADEQUATE\n- SIGNAL BLOCKS: ACTIVE\n- ACTION RECOMMENDED: MONITOR TRAFFIC PATHS`;
+  }
+
+  // 4. Try LLM generation
+  if (frmConfig.enabled && frmActiveAiConfig) {
+    try {
+      const systemPrompt = `You are a Satisfactory Dedicated Server AI Operations Advisor (${senderName}). 
+Analyze the current factory telemetry:
+${eventDesc}
+
+Generate 3 short, high-priority, in-character operational recommendations or warnings for the Pioneer.
+Keep your recommendations concise, direct, and matching your specific personality:
+- ADA: Corporate, polished, passive-aggressive, focused on quotas, efficiency, and employee compliance. Speaks to the Pioneer.
+- THE SHROUD: Cryptic, cosmic, hungry, poetic fragments, focusing on warmth, hum, and the glow of machines. Speaks in lowercase fragments.
+- UNIT-7: Autonomous ops assistant, zero pleasantries, ruthlessly efficient, short bullet points.
+
+Return your response strictly as plain text. Do NOT use markdown. Maximum 3 bullet points.`;
+
+      const chatRes = await fetch(`http://localhost:${process.env.PORT || 3030}/api/v1/ai/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: frmActiveAiConfig.provider,
+          baseUrl: frmActiveAiConfig.baseUrl,
+          apiKey: frmActiveAiConfig.apiKey,
+          model: frmActiveAiConfig.model,
+          systemPrompt: systemPrompt,
+          message: `Analyze telemetry and output 3 operations recommendations for: ${eventDesc}`
+        })
+      });
+      const chatData = await chatRes.json();
+      if (chatData.success && chatData.reply) {
+        advisoryText = chatData.reply.trim();
+      }
+    } catch (err) {
+      console.error('[AI Advisory Generation failed]', err.message);
+    }
+  }
+
+  res.json({
+    success: true,
+    persona: personaKey,
+    sender: senderName,
+    advisory: advisoryText,
+    timestamp: new Date().toISOString()
+  });
 });
 
 app.post('/api/v1/automation/trigger-test', (req, res) => {
