@@ -1956,12 +1956,35 @@ async function sendTerminalShellCommand() {
   const val = input.value.trim();
   input.value = '';
 
-  // Echo user command
-  if (socket && socket.readyState === WebSocket.OPEN) {
-    socket.send(JSON.stringify({ type: 'terminal_command', data: '__echo__:' + val }));
-  } else {
-    appendTerminalLog({ source: 'USER', text: val });
+  // Local clear command handler
+  if (val.toLowerCase() === 'clear' || val.toLowerCase() === '/clear') {
+    const terminal = document.getElementById('terminal-content');
+    if (terminal) {
+      const body = terminal.querySelector('.flex-1');
+      if (body) body.innerHTML = '<div class="text-tertiary font-mono text-xs">[SYSTEM] Console buffer cleared. Ready for input.</div>';
+      const lineNumbers = terminal.querySelector('.line-numbers');
+      if (lineNumbers) lineNumbers.innerHTML = '';
+      updateLineNumbers();
+    }
+    return;
   }
+
+  // Detect if it is a command (starts with / or is a known command keyword)
+  const isCmd = val.startsWith('/') || ['help', 'state', 'mods', 'grid', 'power', 'trains', 'doggos', 'players', 'switches', 'reboot'].includes(val.toLowerCase().split(' ')[0]);
+
+  if (isCmd) {
+    // Command execution pathway - route to WebSocket server
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ type: 'terminal_command', data: val }));
+    } else {
+      appendTerminalLog({ source: 'USER', text: val });
+      appendTerminalLog({ source: 'AI', text: '⚠ Console link offline. Cannot execute command.' });
+    }
+    return;
+  }
+
+  // AI Prompt query pathway
+  appendTerminalLog({ source: 'USER', text: val });
 
   // If we have an API key (or local provider), call AI
   const isLocal = ['ollama', 'lmstudio', 'llamacpp'].includes(activeAiConfig.provider);
@@ -1993,7 +2016,8 @@ async function sendTerminalShellCommand() {
         apiKey: activeAiConfig.apiKey,
         model: activeAiConfig.model,
         systemPrompt: activeAiConfig.systemPrompt,
-        message: val
+        message: val,
+        temperature: serverState ? serverState.aiTemperature : 0.78
       })
     });
     const data = await res.json();

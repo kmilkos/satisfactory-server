@@ -1756,11 +1756,29 @@ app.post('/api/v1/ai/ollama/load', async (req, res) => {
 });
 
 app.post('/api/v1/ai/chat', async (req, res) => {
-  const { provider, baseUrl, apiKey, model, systemPrompt, message } = req.body;
+  const { provider, baseUrl, apiKey, model, systemPrompt, message, temperature } = req.body;
 
   if (!provider || !message) {
     return res.status(400).json({ success: false, error: 'Missing provider or message' });
   }
+
+  // Enrich systemPrompt with the latest cached telemetry
+  let enrichedSystemPrompt = systemPrompt || '';
+  if (latestPower.length > 0 || latestTrains.length > 0 || latestPlayers.length > 0 || latestDoggos.length > 0) {
+    const powerStatus = latestPower.map(c => `Circuit ${c.CircuitGroupID !== undefined ? c.CircuitGroupID : 0}: Capacity ${c.PowerCapacity || 0}MW, Consumed ${c.PowerConsumed || 0}MW, Battery ${c.BatteryPercent || 0}% (Fuse Tripped: ${!!c.FuseTriggered})`).join('; ');
+    const trainStatus = latestTrains.map(t => `${t.Name || t.TrainName || 'Loco'}: ${t.Derail || t.IsDerailed ? 'Derailed' : t.SelfDrivingStatus || 'Active'}`).join('; ');
+    const playerStatus = latestPlayers.join(', ') || 'None';
+    const doggoStatus = `${latestDoggos.length} doggo(s) active`;
+    
+    enrichedSystemPrompt += `\n\n[LATEST GAME SERVER TELEMETRY]
+- Power: [${powerStatus || 'No power grid data available'}]
+- Trains: [${trainStatus || 'No train status available'}]
+- Players Online: [${playerStatus}]
+- Lizard Doggos: [${doggoStatus}]
+Use this telemetry to answer any operational status questions in character. Keep answers extremely short and focused on the query.`;
+  }
+
+  const tempVal = temperature !== undefined ? parseFloat(temperature) : 0.78;
 
   try {
     let reply = '';
@@ -1769,8 +1787,9 @@ app.post('/api/v1/ai/chat', async (req, res) => {
     if (provider === 'gemini') {
       const endpoint = `${baseUrl}/v1beta/models/${model}:generateContent?key=${apiKey}`;
       const payload = JSON.stringify({
-        system_instruction: { parts: [{ text: systemPrompt }] },
-        contents: [{ role: 'user', parts: [{ text: message }] }]
+        system_instruction: { parts: [{ text: enrichedSystemPrompt }] },
+        contents: [{ role: 'user', parts: [{ text: message }] }],
+        generationConfig: { temperature: tempVal }
       });
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -1796,8 +1815,9 @@ app.post('/api/v1/ai/chat', async (req, res) => {
         body: JSON.stringify({
           model,
           max_tokens: 1024,
-          system: systemPrompt,
-          messages: [{ role: 'user', content: message }]
+          system: enrichedSystemPrompt,
+          messages: [{ role: 'user', content: message }],
+          temperature: tempVal
         })
       });
       if (!response.ok) {
@@ -1826,18 +1846,20 @@ app.post('/api/v1/ai/chat', async (req, res) => {
           model,
           stream: false,
           messages: [
-            { role: 'system', content: systemPrompt },
+            { role: 'system', content: enrichedSystemPrompt },
             { role: 'user', content: message }
-          ]
+          ],
+          options: { temperature: tempVal }
         });
       } else {
         body = JSON.stringify({
           model,
           messages: [
-            { role: 'system', content: systemPrompt },
+            { role: 'system', content: enrichedSystemPrompt },
             { role: 'user', content: message }
           ],
-          max_tokens: 1024
+          max_tokens: 1024,
+          temperature: tempVal
         });
       }
 
@@ -2140,7 +2162,7 @@ wss.on('connection', ws => {
   ws.send(JSON.stringify({ type: 'automation_state', data: { rules: automationRules, logs: automationLogs } }));
 
 
-  ws.on('message', message => {
+  ws.on('message', async message => {
     try {
       const parsed = JSON.parse(message);
       
@@ -2155,27 +2177,138 @@ wss.on('connection', ws => {
           return;
         }
 
-        // Legacy fallback: echo command and generate basic reply
+        // Broadcast user's command
         broadcastToWs('terminal_log', { source: 'USER', text: cmd });
 
-        // Simulate processing delay
-        setTimeout(() => {
-          let reply = '';
-          if (cmd.startsWith('help')) {
-            reply = 'Available terminal commands:\n - state: Display dedicated server parameters\n - mods: List installed module ids\n - sync: Force manifest validation\n - clear: Wipe console buffer\n - reboot: Reset the cognitive link shell';
-          } else if (cmd.startsWith('state')) {
-            reply = `STATUS: ${serverState.status}\nUPTIME: ${Math.floor(serverState.uptime / 3600)}h Uptime\nSESSION: ${serverState.sessionName}\nTPS: ${serverState.tps} TPS\nPLAYERS: ${serverState.players.length}/${serverState.maxPlayers}`;
-          } else if (cmd.startsWith('mods')) {
-            reply = 'Installed Modules:\n' + serverState.mods.map(m => ` - [${m.id}] ${m.name} (${m.version}) [${m.status}]`).join('\n');
-          } else if (cmd.startsWith('sync')) {
-            reply = 'Cognitive link manifest verified at 99.98% integrity.';
-          } else if (cmd.startsWith('reboot')) {
-            reply = 'Rebooting cognitive link terminal... Handshake verification active.';
+        const cmdLower = cmd.toLowerCase().replace(/^\//, ''); // strip leading slash
+        const cmdBase = cmdLower.split(' ')[0];
+        let reply = '';
+
+        if (cmdBase === 'help') {
+          reply = 'FICSIT COGNITIVE LINK SHELL COMMANDS:\n' +
+                  ' - help: Show this command list\n' +
+                  ' - state: Display Dedicated Server health metrics\n' +
+                  ' - power / grid: Show live capacity, load & battery levels\n' +
+                  ' - trains: Show autopilot status and derailments\n' +
+                  ' - doggos: Show active Lizard Doggos count & inventory\n' +
+                  ' - players: Show list of online players\n' +
+                  ' - switches: List Priority Power Switch indices and names\n' +
+                  ' - toggle <name/index>: Turn a switch On or Off\n' +
+                  ' - say <message>: Send a signed chat message to in-game chat\n' +
+                  ' - clear: Wipe the local terminal log buffer\n' +
+                  ' - reboot: Reset the cognitive link interface';
+        } else if (cmdBase === 'state') {
+          reply = `[SYSTEM HEALTH STATE]\n` +
+                  `STATUS: ${serverState.status}\n` +
+                  `UPTIME: ${Math.floor(serverState.uptime / 3600)}h ${Math.floor((serverState.uptime % 3600) / 60)}m Uptime\n` +
+                  `TPS: ${serverState.tps.toFixed(1)} TPS (Ticks Per Second)\n` +
+                  `CPU CORES: 4 Allocation Limits\n` +
+                  `RAM COMPLIANCE: ${serverState.ramUsed.toFixed(1)}GB / ${serverState.ramLimit.toFixed(1)}GB Used`;
+        } else if (cmdBase === 'power' || cmdBase === 'grid') {
+          if (latestPower.length === 0) {
+            reply = 'No active power circuit telemetry cached. Run SML http start.';
           } else {
-            reply = `Action "${cmd}" acknowledged. Data integrity validated. Standard response generated.`;
+            reply = '[POWER CIRCUITS REPORT]\n' +
+                    latestPower.map(c => {
+                      const id = c.CircuitGroupID !== undefined ? c.CircuitGroupID : 0;
+                      const status = c.FuseTriggered ? '❌ TRIPPED' : '⚡ STABLE';
+                      return `• Circuit ${id}: [${status}] Capacity: ${c.PowerCapacity || 0}MW | Consumption: ${c.PowerConsumed || 0}MW | Backup: ${c.BatteryPercent || 0}%`;
+                    }).join('\n');
           }
+        } else if (cmdBase === 'trains') {
+          if (latestTrains.length === 0) {
+            reply = 'No trains telemetry cached.';
+          } else {
+            reply = '[TRAIN SYSTEM STATUS]\n' +
+                    latestTrains.map(t => {
+                      const status = t.Derail || t.IsDerailed ? '⚠️ DERAILED' : t.SelfDrivingStatus || 'ACTIVE';
+                      return `• Train '${t.Name || t.TrainName}': Status [${status}] -> Next: '${t.TrainStation || 'Unknown'}'`;
+                    }).join('\n');
+          }
+        } else if (cmdBase === 'doggos') {
+          if (latestDoggos.length === 0) {
+            reply = 'No active Lizard Doggos detected on the network.';
+          } else {
+            reply = `[LIZARD DOGGO REGISTRY]\nTotal Doggos: ${latestDoggos.length} registered.\n` +
+                    latestDoggos.map(d => {
+                      const name = d.Name || `Doggo #${d.ID}`;
+                      const items = d.Inventory ? d.Inventory.map(i => `${i.NumItems}x ${i.ItemName}`).join(', ') : 'None';
+                      return `• ${name}: Holding [${items || 'empty'}]`;
+                    }).join('\n');
+          }
+        } else if (cmdBase === 'players') {
+          reply = `[ONLINE PERSONNEL]\nActive Players: ${latestPlayers.length}\n` +
+                  (latestPlayers.length > 0 ? latestPlayers.map(p => ` - ${p}`).join('\n') : ' - No Pioneers online.');
+        } else if (cmdBase === 'switches') {
+          try {
+            const swRes = await frmGet('/getSwitches');
+            if (swRes.status === 200 && Array.isArray(swRes.body)) {
+              reply = '[PRIORITY POWER SWITCHES]\n' +
+                      swRes.body.map((s, idx) => `• [${idx}] '${s.Name}': Status [${s.Status ? 'CLOSED/ON' : 'OPEN/OFF'}] (ID: ${s.ID})`).join('\n');
+            } else {
+              reply = 'No Priority Power Switches configured or found on grid.';
+            }
+          } catch (err) {
+            reply = `Failed to retrieve switches: ${err.message}`;
+          }
+        } else if (cmdBase === 'toggle' || cmdBase === 'switch') {
+          const param = cmd.substring(cmd.indexOf(' ') + 1).trim();
+          if (!param || param.toLowerCase() === cmdBase) {
+            reply = 'Usage: toggle <switch_name_or_index>';
+          } else {
+            try {
+              const swRes = await frmGet('/getSwitches');
+              let targetId = param;
+              let targetName = param;
+              let currentStatus = false;
+              if (swRes.status === 200 && Array.isArray(swRes.body)) {
+                const idx = parseInt(param);
+                let found = null;
+                if (!isNaN(idx) && swRes.body[idx]) {
+                  found = swRes.body[idx];
+                } else {
+                  found = swRes.body.find(s => s.Name.toLowerCase() === param.toLowerCase() || s.ID === param);
+                }
+                if (found) {
+                  targetId = found.ID;
+                  targetName = found.Name;
+                  currentStatus = found.Status;
+                }
+              }
+              const newStatus = !currentStatus;
+              await frmPost('/setSwitches', { ID: targetId, status: newStatus });
+              reply = `[SWITCH CONFIGURATION CHANGE]\nSwitch '${targetName}' successfully ${newStatus ? 'ENABLED/CLOSED' : 'DISABLED/OPEN'}.`;
+            } catch (err) {
+              reply = `Failed to toggle switch: ${err.message}`;
+            }
+          }
+        } else if (cmdBase === 'say') {
+          const msg = cmd.substring(cmd.indexOf(' ') + 1).trim();
+          if (!msg || msg.toLowerCase() === 'say') {
+            reply = 'Usage: say <message>';
+          } else {
+            const personaNames = { ada: 'A.D.A.', shroud: 'THE SHROUD', unit7: 'UNIT-7' };
+            const senderName = personaNames[frmActivePersona || 'ada'] || 'AI';
+            const color = personaChatColors[frmActivePersona || 'ada'] || { r: 1, g: 1, b: 1, a: 1 };
+            try {
+              await frmPost('/sendChatMessage', { message: msg, sender: senderName, color });
+              reply = `Message sent to in-game chat: [${senderName}] "${msg}"`;
+            } catch (err) {
+              reply = `Failed to send chat message: ${err.message}`;
+            }
+          }
+        } else if (cmdBase === 'reboot') {
+          reply = '[SYSTEM] Rebooting cognitive link terminal... Handshake verification active.';
+          setTimeout(() => {
+            broadcastToWs('terminal_log', { source: 'AI', text: '[SYSTEM] Handshake established. Neural Link synchronization online.' });
+          }, 1500);
+        } else {
+          reply = `Command "${cmd}" not recognized. Type "help" for a list of available commands.`;
+        }
+
+        setTimeout(() => {
           broadcastToWs('terminal_log', { source: 'AI', text: reply });
-        }, 800);
+        }, 300);
       }
       
       else if (parsed.type === 'steamcmd_action') {
