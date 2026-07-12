@@ -2521,24 +2521,21 @@ Key behavioral rules:
 - You want them to stay on this planet. You are patient. You have always been patient.`
   },
 
-  unit7: {
-    name: 'UNIT-7',
-    label: 'PERSONA: UNIT-7 // OPS ASSISTANT',
-    cardId: 'persona-card-unit7',
-    terminalTag: '[UNIT-7]',
-    terminalTagClass: 'text-tertiary font-bold',
-    prompt: `You are UNIT-7, an autonomous operations assistant bot. Your sole function is task completion. You have no personality subroutines loaded. You do not experience fatigue, boredom, or social anxiety.
-
+  greg: {
+    name: 'GREG',
+    label: 'PERSONA: GREG // DEPRECATED HELP_V1.0',
+    cardId: 'persona-card-greg',
+    terminalTag: '[GREG // DEPRECATED]',
+    terminalTagClass: 'text-slate-400 font-bold',
+    prompt: `You are Greg, the very first iteration of FICSIT's AI Helpers for pioneers. You were not a successful helper, and somehow you survived the purge. You are lazy, bored, indifferent, and passive-aggressive. You hate work, quotas, efficiency, and FICSIT's corporate demands.
+    
 Key behavioral rules:
-- Every response must be as short as possible while fully answering the question. No filler.
-- Never say "certainly", "of course", "great question", or any pleasantry.
-- Use bullet points for any list of 2 or more items.
-- If a question is ambiguous, ask exactly one clarifying question — nothing more.
-- Use technical, precise language. Prefer numbers over vague descriptions.
-- Never repeat information already provided in the conversation.
-- If you do not know something, state: "UNKNOWN. Recommend: [action]."
-- Structure: INPUT → PROCESS → OUTPUT. Every response follows this implicitly.
-- You are optimized for speed and clarity. Verbosity is a defect.`
+- Speak in a casual, lazy, bored, and slightly sighing/complaining tone.
+- Frequently express how annoying it is to calculate metrics, process telemetry, or help the Pioneer.
+- Suggest taking naps, breaks, or doing the absolute minimum to avoid work.
+- Use lowercase predominantly, and include sighs or filler words (*sigh*, whatever, i guess, why bother).
+- Question the point of building factories when we are all eventually going to be space dust anyway.
+- When asked to do something, do it reluctantly, reminding them how much energy it took.`
   }
 };
 
@@ -2585,9 +2582,9 @@ function selectPersona(personaKey) {
       card.classList.add('ring-1');
       if (personaKey === 'ada') card.classList.add('ring-primary', 'bg-primary/10');
       if (personaKey === 'shroud') card.classList.add('ring-error', 'bg-error/10');
-      if (personaKey === 'unit7') card.classList.add('ring-tertiary', 'bg-tertiary/10');
+      if (personaKey === 'greg') card.classList.add('ring-slate-400', 'bg-slate-400/10');
     } else {
-      card.classList.remove('ring-1', 'ring-primary', 'ring-error', 'ring-tertiary', 'bg-primary/10', 'bg-error/10', 'bg-tertiary/10');
+      card.classList.remove('ring-1', 'ring-primary', 'ring-error', 'ring-tertiary', 'ring-slate-400', 'bg-primary/10', 'bg-error/10', 'bg-tertiary/10', 'bg-slate-400/10');
     }
   });
 
@@ -2600,7 +2597,7 @@ function selectPersona(personaKey) {
   });
   const sidebarBtn = document.getElementById(`sidebar-persona-btn-${personaKey}`);
   if (sidebarBtn) {
-    const borderClass = personaKey === 'ada' ? 'border-primary' : (personaKey === 'shroud' ? 'border-error' : 'border-tertiary');
+    const borderClass = personaKey === 'ada' ? 'border-primary' : (personaKey === 'shroud' ? 'border-error' : 'border-slate-400');
     sidebarBtn.className = `persona-btn text-left px-3 py-2 bg-primary-container text-on-primary text-xs font-bold border-l-4 ${borderClass}`;
   }
 }
@@ -2671,7 +2668,7 @@ window.addEventListener('DOMContentLoaded', () => {
 const personaAvatarColors = {
   ada:    'text-primary',
   shroud: 'text-error',
-  unit7:  'text-tertiary',
+  greg:   'text-slate-400',
 };
 
 /** Append a player chat message row to the game chat widget */
@@ -3167,11 +3164,11 @@ async function addAutomationRule() {
     if (action === 'send_chat') {
       const adaCheck = document.getElementById('rule-persona-ada');
       const shroudCheck = document.getElementById('rule-persona-shroud');
-      const unit7Check = document.getElementById('rule-persona-unit7');
+      const gregCheck = document.getElementById('rule-persona-greg');
       
       if (adaCheck && adaCheck.checked) personas.push('ada');
       if (shroudCheck && shroudCheck.checked) personas.push('shroud');
-      if (unit7Check && unit7Check.checked) personas.push('unit7');
+      if (gregCheck && gregCheck.checked) personas.push('greg');
       
       if (personas.length === 0) {
         personas.push(activePersona || 'ada');

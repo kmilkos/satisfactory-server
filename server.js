@@ -833,7 +833,7 @@ async function handlePlayerJoined(player) {
       });
       const chatData = await chatRes.json();
       if (chatData.success && chatData.reply) {
-        const personaNames = { ada: 'A.D.A.', shroud: 'THE SHROUD', unit7: 'UNIT-7' };
+        const personaNames = { ada: 'A.D.A.', shroud: 'THE SHROUD', greg: 'GREG' };
         const senderName = personaNames[frmActivePersona] || 'AI';
         const color = personaChatColors[frmActivePersona] || { r: 1, g: 1, b: 1, a: 1 };
 
@@ -1919,12 +1919,12 @@ let chatPollTimer = null;
 const personaChatColors = {
   ada:    { r: 1.0, g: 0.745, b: 0.482, a: 1.0 }, // amber/orange  (#ffbf7b)
   shroud: { r: 1.0, g: 0.706, b: 0.671, a: 1.0 }, // error red     (#ffb4ab)
-  unit7:  { r: 0.329, g: 0.894, b: 0.659, a: 1.0 }, // teal-green  (#54e4a8)
+  greg:   { r: 0.6, g: 0.6, b: 0.7, a: 1.0 },     // slate-gray    (#9999b3)
 };
 
 // Active persona + AI config shared with the AI chat bridge
 // (populated when the client selects a persona and saves AI settings)
-let frmActivePersona = null;       // persona key: 'ada' | 'shroud' | 'unit7'
+let frmActivePersona = null;       // persona key: 'ada' | 'shroud' | 'greg'
 let frmActiveAiConfig = null;      // full AI config object from saveAiSettings WS message
 
 /** Make a raw HTTP GET to FRM web server */
@@ -2116,7 +2116,7 @@ async function pollAndRespondToChat() {
     if (!aiReply.trim()) return;
 
     // Persona metadata for the chat message
-    const personaNames = { ada: 'A.D.A.', shroud: 'THE SHROUD', unit7: 'UNIT-7' };
+    const personaNames = { ada: 'A.D.A.', shroud: 'THE SHROUD', greg: 'GREG' };
     const senderName = personaNames[frmActivePersona] || 'AI';
     const color = personaChatColors[frmActivePersona] || { r: 1, g: 1, b: 1, a: 1 };
 
@@ -2297,7 +2297,7 @@ wss.on('connection', ws => {
           if (!msg || msg.toLowerCase() === 'say') {
             reply = 'Usage: say <message>';
           } else {
-            const personaNames = { ada: 'A.D.A.', shroud: 'THE SHROUD', unit7: 'UNIT-7' };
+            const personaNames = { ada: 'A.D.A.', shroud: 'THE SHROUD', greg: 'GREG' };
             const senderName = personaNames[frmActivePersona || 'ada'] || 'AI';
             const color = personaChatColors[frmActivePersona || 'ada'] || { r: 1, g: 1, b: 1, a: 1 };
             try {
@@ -2552,7 +2552,7 @@ Ensure you do NOT include any markdown code blocks, backticks, or other text out
 
       // Send chat messages for each persona
       for (const personaKey of personasRequested) {
-        const personaNames = { ada: 'A.D.A.', shroud: 'THE SHROUD', unit7: 'UNIT-7' };
+        const personaNames = { ada: 'A.D.A.', shroud: 'THE SHROUD', greg: 'GREG' };
         const senderName = personaNames[personaKey] || 'AI';
         const color = personaChatColors[personaKey] || { r: 1, g: 1, b: 1, a: 1 };
         
@@ -2737,7 +2737,7 @@ app.get('/api/v1/ai/advisory', async (req, res) => {
 
   // 2. Decide the persona to generate the advisory
   const personaKey = frmActivePersona || 'ada';
-  const personaNames = { ada: 'A.D.A.', shroud: 'THE SHROUD', unit7: 'UNIT-7' };
+  const personaNames = { ada: 'A.D.A.', shroud: 'THE SHROUD', greg: 'GREG' };
   const senderName = personaNames[personaKey] || 'AI';
   
   // 3. Fallback heuristic response if LLM is not configured/offline
@@ -2747,7 +2747,7 @@ app.get('/api/v1/ai/advisory', async (req, res) => {
   } else if (personaKey === 'shroud') {
     advisoryText = `...the machines are singing... they glow in the dark... keep them warm... feed the generators... do not let them grow cold...`;
   } else {
-    advisoryText = `- SYSTEM STATUS: ONLINE\n- POWER MARGIN: ADEQUATE\n- SIGNAL BLOCKS: ACTIVE\n- ACTION RECOMMENDED: MONITOR TRAFFIC PATHS`;
+    advisoryText = `• whatever. everything is fine, i guess.\n• the machines are still running. do you really need to build more?\n• please go take a break, this is too much work.`;
   }
 
   // 4. Try LLM generation
@@ -2761,7 +2761,7 @@ Generate 3 short, high-priority, in-character operational recommendations or war
 Keep your recommendations concise, direct, and matching your specific personality:
 - ADA: Corporate, polished, passive-aggressive, focused on quotas, efficiency, and employee compliance. Speaks to the Pioneer.
 - THE SHROUD: Cryptic, cosmic, hungry, poetic fragments, focusing on warmth, hum, and the glow of machines. Speaks in lowercase fragments.
-- UNIT-7: Autonomous ops assistant, zero pleasantries, ruthlessly efficient, short bullet points.
+- GREG: Deprecated first-generation AI helper. Lazy, bored, indifferent, passive-aggressive. Hates work, uses lowercase and filler words (*sigh*, whatever, i guess), and suggests taking breaks or naps.
 
 Return your response strictly as plain text. Do NOT use markdown. Maximum 3 bullet points.`;
 
