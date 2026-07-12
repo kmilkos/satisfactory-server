@@ -3068,47 +3068,64 @@ function renderAutomationLogs() {
 }
 
 async function addAutomationRule() {
-  const nameInput = document.getElementById('rule-name');
-  const triggerSelect = document.getElementById('rule-trigger');
-  const actionSelect = document.getElementById('rule-action');
-  const paramInput = document.getElementById('rule-param');
-  
-  const name = nameInput.value.trim();
-  const trigger = triggerSelect.value;
-  const action = actionSelect.value;
-  const parameter = paramInput.value.trim();
-  
-  if (!name || !parameter) {
-    showSyncNotice('rule-config-notice', 'Name and parameters are required.', true);
-    return;
-  }
-  
-  const personas = [];
-  if (action === 'send_chat') {
-    if (document.getElementById('rule-persona-ada').checked) personas.push('ada');
-    if (document.getElementById('rule-persona-shroud').checked) personas.push('shroud');
-    if (document.getElementById('rule-persona-unit7').checked) personas.push('unit7');
-    if (personas.length === 0) {
-      personas.push(activePersona || 'ada');
+  console.log('[DEBUG] addAutomationRule called');
+  try {
+    const nameInput = document.getElementById('rule-name');
+    const triggerSelect = document.getElementById('rule-trigger');
+    const actionSelect = document.getElementById('rule-action');
+    const paramInput = document.getElementById('rule-param');
+    
+    if (!nameInput || !triggerSelect || !actionSelect || !paramInput) {
+      throw new Error('Could not find all required form inputs in the DOM.');
     }
-  }
+    
+    const name = nameInput.value.trim();
+    const trigger = triggerSelect.value;
+    const action = actionSelect.value;
+    const parameter = paramInput.value.trim();
+    
+    if (!name || !parameter) {
+      alert('Rule name and parameter/template are required!');
+      return;
+    }
+    
+    const personas = [];
+    if (action === 'send_chat') {
+      const adaCheck = document.getElementById('rule-persona-ada');
+      const shroudCheck = document.getElementById('rule-persona-shroud');
+      const unit7Check = document.getElementById('rule-persona-unit7');
+      
+      if (adaCheck && adaCheck.checked) personas.push('ada');
+      if (shroudCheck && shroudCheck.checked) personas.push('shroud');
+      if (unit7Check && unit7Check.checked) personas.push('unit7');
+      
+      if (personas.length === 0) {
+        personas.push(activePersona || 'ada');
+      }
+    }
 
-  const newRule = {
-    id: 'rule_' + Math.random().toString(36).substring(2, 9),
-    name,
-    enabled: true,
-    trigger,
-    action,
-    parameter,
-    personas
-  };
-  
-  automationRules.push(newRule);
-  await saveAutomationRules();
-  
-  // Clear inputs
-  nameInput.value = '';
-  paramInput.value = '';
+    const newRule = {
+      id: 'rule_' + Math.random().toString(36).substring(2, 9),
+      name,
+      enabled: true,
+      trigger,
+      action,
+      parameter,
+      personas
+    };
+    
+    console.log('[DEBUG] Pushing new rule:', newRule);
+    automationRules.push(newRule);
+    await saveAutomationRules();
+    
+    // Clear inputs
+    nameInput.value = '';
+    paramInput.value = '';
+    console.log('[DEBUG] Rule added successfully');
+  } catch (err) {
+    console.error('[DEBUG] Failed to add rule:', err);
+    alert('Failed to add rule: ' + err.message);
+  }
 }
 
 async function toggleRuleState(ruleId) {
