@@ -2858,6 +2858,7 @@ async function sendPersonaChatMessage() {
 
 function onRuleActionChange() {
   const action = document.getElementById('rule-action').value;
+  const trigger = document.getElementById('rule-trigger').value;
   const label = document.getElementById('rule-param-label');
   const paramInput = document.getElementById('rule-param');
   const guideContainer = document.getElementById('rule-action-guide-container');
@@ -2866,29 +2867,84 @@ function onRuleActionChange() {
   if (action === 'send_chat') {
     if (personasContainer) personasContainer.classList.remove('hidden');
     label.innerText = 'CHAT MESSAGE TEMPLATE (supports variables)';
-    paramInput.placeholder = 'ALERT: Grid failure on circuit {circuitGroupID}!';
+    
+    // Choose template placeholder & guide info based on trigger
+    let placeholder = '';
+    let variablesGuide = '';
+
+    if (trigger === 'power_outage') {
+      placeholder = 'ALERT: Power grid failure detected on Circuit {circuitGroupID}! Capacity: {capacity}MW.';
+      variablesGuide = `
+        <div class="col-span-4 text-primary font-mono">{circuitGroupID}</div>
+        <div class="col-span-8">Failed priority power grid ID.</div>
+        <div class="col-span-4 text-primary font-mono">{capacity}</div>
+        <div class="col-span-8">Capacity of the power grid in MW.</div>
+        <div class="col-span-4 text-primary font-mono">{consumed}</div>
+        <div class="col-span-8">MW power consumed prior to outage.</div>
+      `;
+    } else if (trigger === 'battery_low') {
+      placeholder = 'WARNING: Backup battery level critical at {batteryPercent}% on Circuit {circuitGroupID}!';
+      variablesGuide = `
+        <div class="col-span-4 text-primary font-mono">{circuitGroupID}</div>
+        <div class="col-span-8">Affected power grid ID.</div>
+        <div class="col-span-4 text-primary font-mono">{batteryPercent}</div>
+        <div class="col-span-8">Current charge percentage (e.g. 25).</div>
+        <div class="col-span-4 text-primary font-mono">{timeEmpty}</div>
+        <div class="col-span-8">Estimated minutes until full depletion.</div>
+      `;
+    } else if (trigger === 'train_derail') {
+      placeholder = 'ALERT: Train {trainName} has derailed en route to {trainStation}!';
+      variablesGuide = `
+        <div class="col-span-4 text-primary font-mono">{trainName}</div>
+        <div class="col-span-8">The name of the derailed train.</div>
+        <div class="col-span-4 text-primary font-mono">{trainStation}</div>
+        <div class="col-span-8">Target destination station name.</div>
+      `;
+    } else if (trigger === 'train_error') {
+      placeholder = 'DIAGNOSTIC: Train {trainName} reports error: {errorMsg}.';
+      variablesGuide = `
+        <div class="col-span-4 text-primary font-mono">{trainName}</div>
+        <div class="col-span-8">The name of the stuck or erroring train.</div>
+        <div class="col-span-4 text-primary font-mono">{errorMsg}</div>
+        <div class="col-span-8">Autopilot or rail error description.</div>
+      `;
+    } else if (trigger === 'player_join') {
+      placeholder = 'Welcome back to the server, {playerName}.';
+      variablesGuide = `
+        <div class="col-span-4 text-primary font-mono">{playerName}</div>
+        <div class="col-span-8">The username of the connecting player.</div>
+      `;
+    } else if (trigger === 'player_leave') {
+      placeholder = '{playerName} has disconnected from the node.';
+      variablesGuide = `
+        <div class="col-span-4 text-primary font-mono">{playerName}</div>
+        <div class="col-span-8">The username of the disconnecting player.</div>
+      `;
+    } else if (trigger === 'doggo_item') {
+      placeholder = 'Good doggo! {doggoName} retrieved {itemNum}x {itemName}!';
+      variablesGuide = `
+        <div class="col-span-4 text-primary font-mono">{doggoName}</div>
+        <div class="col-span-8">Name of the Lizard Doggo.</div>
+        <div class="col-span-4 text-primary font-mono">{itemName}</div>
+        <div class="col-span-8">The name of the item retrieved.</div>
+        <div class="col-span-4 text-primary font-mono">{itemNum}</div>
+        <div class="col-span-8">Quantity of items found (integer).</div>
+      `;
+    }
+
+    paramInput.placeholder = placeholder;
+    
     if (guideContainer) {
       guideContainer.innerHTML = `
         <div class="flex items-center gap-1.5 text-primary mb-1">
           <span class="material-symbols-outlined text-[12px]">info</span>
-          <span class="font-bold uppercase tracking-wider text-[9px]">Action Guide: In-Game Chat Broadcast</span>
+          <span class="font-bold uppercase tracking-wider text-[9px]">Action Guide: Chat Broadcast</span>
         </div>
-        <p class="mb-2 text-on-surface-variant font-code-sm">Broadcasts a message to the in-game chat when the event triggers. The message is signed by the active AI persona (ADA, Shroud, or Unit-7) with their corresponding color branding.</p>
+        <p class="mb-2 text-on-surface-variant font-code-sm">Broadcasts an AI-generated reaction to the in-game chat when the event triggers. The reaction is signed and branded by your chosen personas.</p>
         <div class="grid grid-cols-12 gap-1 text-[9px] border-t border-outline-variant/20 pt-1.5 mt-1.5">
           <div class="col-span-4 font-bold text-on-surface">VARIABLE</div>
           <div class="col-span-8 font-bold text-on-surface">REPLACED BY</div>
-          
-          <div class="col-span-4 text-primary font-mono">{circuitGroupID}</div>
-          <div class="col-span-8">Failed priority power grid ID.</div>
-          
-          <div class="col-span-4 text-primary font-mono">{batteryPercent}</div>
-          <div class="col-span-8">Remaining backup battery bank %.</div>
-          
-          <div class="col-span-4 text-primary font-mono">{trainName}</div>
-          <div class="col-span-8">The name of the derailed or stuck train.</div>
-          
-          <div class="col-span-4 text-primary font-mono">{itemName}</div>
-          <div class="col-span-8">Item retrieved by Lizard Doggo.</div>
+          ${variablesGuide}
         </div>
       `;
     }

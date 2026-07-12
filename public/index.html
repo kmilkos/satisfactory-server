@@ -1479,7 +1479,7 @@
                             <div class="grid grid-cols-2 gap-3">
                                 <div>
                                     <label class="block text-[9px] font-bold font-label-caps text-on-surface-variant mb-1">EVENT TRIGGER</label>
-                                    <select id="rule-trigger" class="w-full bg-surface-container-lowest border border-outline-variant text-on-surface text-[11px] px-2 py-2 font-code-sm focus:border-primary focus:ring-0 outline-none">
+                                    <select id="rule-trigger" onchange="onRuleActionChange()" class="w-full bg-surface-container-lowest border border-outline-variant text-on-surface text-[11px] px-2 py-2 font-code-sm focus:border-primary focus:ring-0 outline-none">
                                         <option value="power_outage">Power Outage (Fuse Tripped)</option>
                                         <option value="battery_low">Backup Battery Low (&lt;30%)</option>
                                         <option value="train_derail">Train Derailed</option>
